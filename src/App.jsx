@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { evaluateSchemeEligibility, getEligibilityStatusLabel } from "./eligibility.js";
 import { answerSchemeQuestion } from "./chatbot.js";
+import AdminDirectory from "./AdminDirectory.jsx";
 import AdminDashboard from "./AdminDashboard.jsx";
 import { readAdminSchemeCatalog, writeAdminSchemeCatalog } from "./admin-catalog.js";
 import { readSavedSchemes, writeSavedSchemes } from "./saved-schemes.js";
 import { categories, schemes as defaultSchemes } from "./data/schemes.js";
 import { localizeScheme, translate } from "./localization.js";
+import { apiRequest } from "./api.js";
 import HeroIllustration from "./HeroIllustration.jsx";
 import {
   searchNearbyServiceCentres,
@@ -15,7 +17,9 @@ import {
 } from "./service-centres.js";
 import {
   acknowledgeSchemeCatalogChanges,
+  getUnreadNotifications,
   getSmartNotifications,
+  markNotificationAsRead,
   readSchemeCatalogChanges,
 } from "./notifications.js";
 import { clampChatPosition, getChatPanelLayout } from "./chat-position.js";
@@ -154,9 +158,18 @@ function App() {
   const schemeCatalog = schemeCatalogState.catalog;
   const [authMode, setAuthMode] = useState("register");
   const [account, setAccount] = useState(null);
+  const [apiConfigured, setApiConfigured] = useState(false);
+  const [emailConfigured, setEmailConfigured] = useState(false);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+  const [authStatus, setAuthStatus] = useState("checking");
+  const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState("");
   const [startedChecklistIds, setStartedChecklistIds] = useState([]);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState(() => new Set());
   const [viewportSize, setViewportSize] = useState(() => ({
     width: typeof window === "undefined" ? 0 : window.innerWidth,
     height: typeof window === "undefined" ? 0 : window.innerHeight,
@@ -172,7 +185,14 @@ function App() {
       return { changes: [], error: true };
     }
   });
-  const t = (text) => translate(text, language);
+  const t = useCallback((text) => translate(text, language), [language]);
+  const authStatusLabel = authStatus === "checking" || authStatus === "loading-profile"
+    ? t("Checking secure session…")
+    : authStatus === "error"
+      ? t("Account setup needs attention")
+      : apiConfigured
+        ? t("MongoDB Atlas sign-in · welfare details are session-only")
+        : t("Authentication setup required");
   const selectedSchemeRecord = schemeCatalog.find((scheme) => scheme.id === selectedSchemeId);
   const selectedScheme = localizeScheme(selectedSchemeRecord, language);
   const kannadaSelectedScheme = localizeScheme(selectedSchemeRecord, "kn");
@@ -189,6 +209,43 @@ function App() {
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
+
+  useEffect(() => {
+    let active = true;
+    const restoreAccount = async () => {
+      try {
+        const { configured, emailConfigured: isEmailConfigured } = await apiRequest("/health");
+        if (!active) return;
+        setApiConfigured(configured);
+        setEmailConfigured(isEmailConfigured);
+        if (!configured) {
+          setAuthStatus("unconfigured");
+          return;
+        }
+
+        const { account: restoredAccount } = await apiRequest("/auth/me");
+        if (!active) return;
+        setAccount(restoredAccount);
+        if (restoredAccount) {
+          setPersonalProfile((current) => ({ ...current, fullName: restoredAccount.fullName }));
+        }
+        setAuthStatus("ready");
+      } catch (error) {
+        console.error("Could not restore the account session.", error);
+        if (active) {
+          setAuthStatus("error");
+          setAuthError(error instanceof Error
+            ? error.message
+            : t("Could not restore your sign-in session."));
+        }
+      }
+    };
+
+    void restoreAccount();
+    return () => {
+      active = false;
+    };
+  }, [t]);
 
   useEffect(() => {
     const updateViewportSize = () => {
@@ -274,6 +331,7 @@ function App() {
     }),
     [catalogTracking.changes, collectedDocuments, relevantNotificationSchemeIds, schemeCatalog, startedChecklistIds],
   );
+  const unreadNotifications = getUnreadNotifications(smartNotifications, readNotificationIds);
   const chatWidgetStyle = chatPosition
     ? {
         left: `${chatPosition.left}px`,
@@ -613,20 +671,95 @@ function App() {
     }
   };
 
-  const handleAuthSubmit = (event) => {
+  const handleAuthSubmit = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email")).trim();
     const enteredName = String(formData.get("fullName") || "").trim();
-    setAccount({
-      email,
-      fullName: enteredName || email.split("@")[0],
-    });
-    if (enteredName) {
-      setPersonalProfile((current) => ({ ...current, fullName: enteredName }));
+    const password = String(formData.get("password"));
+    const form = event.currentTarget;
+    if (!apiConfigured) {
+      setAuthError(t("Authentication is not configured. Contact the site administrator."));
+      return;
     }
-    event.currentTarget.reset();
-    setScreen("profile");
+
+    setAuthLoading(true);
+    setAuthError("");
+    setAuthNotice("");
+    try {
+      if (authMode === "register") {
+        const { email: verificationEmail } = await apiRequest("/auth/register", {
+          method: "POST",
+          body: JSON.stringify({ email, password, fullName: enteredName }),
+        });
+        setPendingVerificationEmail(verificationEmail);
+        setAuthNotice(t("A six-digit verification code was sent to your email."));
+        form.reset();
+        return;
+      }
+
+      const { account: signedInAccount } = await apiRequest("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      setAccount(signedInAccount);
+      setPersonalProfile((current) => ({ ...current, fullName: signedInAccount.fullName }));
+      setAuthStatus("ready");
+      form.reset();
+      setScreen("profile");
+    } catch (error) {
+      console.error("Account authentication request failed.", error);
+      setAuthError(error instanceof Error
+        ? error.message
+        : t("Authentication failed. Check your connection and try again."));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const verifyEmailAddress = async (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const code = String(formData.get("code")).trim();
+    setAuthLoading(true);
+    setAuthError("");
+    setAuthNotice("");
+    try {
+      const { account: verifiedAccount } = await apiRequest("/auth/verify-email", {
+        method: "POST",
+        body: JSON.stringify({ email: pendingVerificationEmail, code }),
+      });
+      setAccount(verifiedAccount);
+      setPersonalProfile((current) => ({ ...current, fullName: verifiedAccount.fullName }));
+      setPendingVerificationEmail("");
+      setAuthStatus("ready");
+      setScreen("profile");
+    } catch (error) {
+      console.error("Email verification failed.", error);
+      setAuthError(error instanceof Error
+        ? error.message
+        : t("The verification code is incorrect or expired. Request a new code."));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const resendEmailVerification = async () => {
+    setAuthLoading(true);
+    setAuthError("");
+    setAuthNotice("");
+    try {
+      await apiRequest("/auth/resend-otp", {
+        method: "POST",
+        body: JSON.stringify({ email: pendingVerificationEmail }),
+      });
+      setAuthNotice(t("A new verification code has been sent."));
+    } catch (error) {
+      console.error("Could not resend the email verification code.", error);
+      setAuthError(error instanceof Error ? error.message : t("Could not resend the verification code."));
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const updatePersonalProfile = (event) => {
@@ -639,8 +772,26 @@ function App() {
     setProfileSaved(false);
   };
 
-  const savePersonalProfile = (event) => {
+  const savePersonalProfile = async (event) => {
     event.preventDefault();
+    const fullName = personalProfile.fullName.trim();
+    setProfileSaveError("");
+    if (account) {
+      try {
+        const { account: updatedAccount } = await apiRequest("/auth/profile", {
+          method: "PATCH",
+          body: JSON.stringify({ fullName }),
+        });
+        setAccount(updatedAccount);
+      } catch (error) {
+        console.error("Could not save the account display name.", error);
+        setProfileSaveError(error instanceof Error
+          ? error.message
+          : t("Could not save your account name."));
+        return;
+      }
+    }
+
     const birthDate = personalProfile.dateOfBirth
       ? new Date(`${personalProfile.dateOfBirth}T00:00:00`)
       : null;
@@ -659,24 +810,66 @@ function App() {
     });
     setAccount((current) => current && ({
       ...current,
-      fullName: personalProfile.fullName.trim() || current.fullName,
+      fullName: fullName || current.fullName,
     }));
     setProfileSaved(true);
     setHasChecked(false);
   };
 
-  const signOut = () => {
+  const signOut = async () => {
+    if (!apiConfigured) {
+      setAuthError(t("Authentication is not configured. Contact the site administrator."));
+      return;
+    }
+
+    setAuthError("");
+    try {
+      await apiRequest("/auth/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Could not sign out of the account.", error);
+      setAuthError(error instanceof Error ? error.message : t("Could not sign out. Try again."));
+      return;
+    }
+
     setAccount(null);
     setPersonalProfile(initialPersonalProfile);
     setProfile(initialProfile);
     setHasChecked(false);
     setProfileSaved(false);
+    setProfileSaveError("");
     setCollectedDocuments({});
     setStartedChecklistIds([]);
     setScreen("dashboard");
   };
 
-  if (screen === "admin") {
+  if (screen === "admin-directory") {
+    return (
+      <AdminDirectory
+        account={account}
+        apiConfigured={apiConfigured}
+        language={language}
+        onBack={() => setScreen("dashboard")}
+        t={t}
+      />
+    );
+  }
+
+  if (screen === "admin" && account?.role !== "admin") {
+    return (
+      <div className="account-page admin-access-denied" lang={language}>
+        <div className="account-card">
+          <div className="account-icon"><ShieldCheck size={21} /></div>
+          <h1 className="account-title">{t("Administrator access is required.")}</h1>
+          <p className="account-copy">{t("Sign in with an administrator account to open the admin dashboard.")}</p>
+          <button className="primary-button account-submit" type="button" onClick={() => setScreen("dashboard")}>
+            {t("Back to overview")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "admin" && account?.role === "admin") {
     return (
       <AdminDashboard
         catalog={schemeCatalog}
@@ -707,7 +900,7 @@ function App() {
               </select>
               <ChevronDown size={14} />
             </label>
-            <span className="prototype-label"><span /> {t("Prototype mode · personal data not saved")}</span>
+            <span className="prototype-label"><span /> {authStatusLabel}</span>
           </div>
         </header>
 
@@ -723,38 +916,117 @@ function App() {
               <button className="account-back" onClick={() => setScreen("dashboard")}>← {t("Back to overview")}</button>
               <div className="account-icon"><UserRound size={21} /></div>
               <div className="section-kicker">{t("YOUR JAN SAHAYAK SPACE")}</div>
-              <h1 className="account-title">{authMode === "register" ? t("Create your account") : t("Welcome back")}</h1>
+              <h1 className="account-title">
+                {pendingVerificationEmail
+                  ? t("Verify your email")
+                  : authMode === "register"
+                    ? t("Create your account")
+                    : t("Welcome back")}
+              </h1>
               <p className="account-copy">
-                {authMode === "register"
-                  ? t("Set up a profile so your scheme search can be more personal.")
-                  : t("Sign in to continue to your profile and scheme discovery.")}
+                {pendingVerificationEmail
+                  ? t("Enter the six-digit code sent to your email. It expires in 10 minutes.")
+                  : authMode === "register"
+                    ? t("Create a secure account with your email and password. Welfare details remain in this page session.")
+                    : t("Sign in to continue to your profile and scheme discovery.")}
               </p>
-              <form className="account-form" onSubmit={handleAuthSubmit}>
-                {authMode === "register" && (
+              {pendingVerificationEmail ? (
+                <>
+                  <p className="account-copy"><strong>{pendingVerificationEmail}</strong></p>
+                  <form className="account-form" onSubmit={verifyEmailAddress}>
+                    <label className="field">
+                      <span>{t("Verification code")}</span>
+                      <input
+                        name="code"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        pattern="[0-9]{6}"
+                        maxLength={6}
+                        placeholder="000000"
+                        required
+                      />
+                    </label>
+                    <button className="primary-button account-submit" type="submit" disabled={authLoading}>
+                      {authLoading ? t("Working…") : t("Verify email")} <ArrowRight size={16} />
+                    </button>
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={resendEmailVerification}
+                      disabled={authLoading || !emailConfigured}
+                    >
+                      {t("Resend code")}
+                    </button>
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={() => {
+                        setPendingVerificationEmail("");
+                        setAuthError("");
+                        setAuthNotice("");
+                      }}
+                    >
+                      {t("Change email")}
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <form className="account-form" onSubmit={handleAuthSubmit}>
+                  {authMode === "register" && (
+                    <label className="field">
+                      <span>{t("Full name")}</span>
+                      <input name="fullName" type="text" autoComplete="name" placeholder={t("Enter your name")} required />
+                    </label>
+                  )}
                   <label className="field">
-                    <span>{t("Full name")}</span>
-                    <input name="fullName" type="text" autoComplete="name" placeholder={t("Enter your name")} required />
+                    <span>{t("Email address")}</span>
+                    <input name="email" type="email" autoComplete="email" placeholder={t("you@example.com")} required />
                   </label>
-                )}
-                <label className="field">
-                  <span>{t("Email address")}</span>
-                  <input name="email" type="email" autoComplete="email" placeholder={t("you@example.com")} required />
-                </label>
-                <label className="field">
-                  <span>{t("Demo password")} <small>{t("(do not reuse a real password)")}</small></span>
-                  <input name="password" type="password" autoComplete={authMode === "register" ? "new-password" : "current-password"} minLength="8" placeholder={t("At least 8 characters")} required />
-                </label>
-                <button className="primary-button account-submit" type="submit">
-                  {authMode === "register" ? t("Create account") : t("Sign in")} <ArrowRight size={16} />
-                </button>
-              </form>
-              <p className="auth-switch">
-                {authMode === "register" ? t("Already have an account?") : t("New to Jan Sahayak?")}{" "}
-                <button onClick={() => setAuthMode(authMode === "register" ? "login" : "register")}>
-                  {authMode === "register" ? t("Sign in") : t("Create account")}
-                </button>
-              </p>
-              <div className="prototype-warning"><ShieldCheck size={16} /> {t("Demo only: this form does not create or verify an account. Do not enter a real password.")}</div>
+                  <label className="field">
+                    <span>{t("Password")}</span>
+                    <input name="password" type="password" autoComplete={authMode === "register" ? "new-password" : "current-password"} minLength="8" placeholder={t("At least 8 characters")} required />
+                  </label>
+                  <button
+                    className="primary-button account-submit"
+                    type="submit"
+                    disabled={!apiConfigured || (authMode === "register" && !emailConfigured) || authLoading}
+                  >
+                    {authLoading
+                      ? t("Working…")
+                      : authMode === "register"
+                        ? t("Create account")
+                        : t("Sign in")} <ArrowRight size={16} />
+                  </button>
+                </form>
+              )}
+              {!apiConfigured && (
+                <div className="auth-feedback is-error" role="status">
+                  <ShieldCheck size={16} /> {t("Authentication is not configured. Add MongoDB Atlas settings to the server .env file, then restart the app.")}
+                </div>
+              )}
+              {apiConfigured && authMode === "register" && !emailConfigured && !pendingVerificationEmail && (
+                <div className="auth-feedback is-error" role="status">
+                  <ShieldCheck size={16} /> {t("Email verification needs SMTP settings. Add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and EMAIL_FROM to .env, then restart the app.")}
+                </div>
+              )}
+              {authError && <p className="auth-feedback is-error" role="alert">{authError}</p>}
+              {authNotice && <p className="auth-feedback is-success" role="status">{authNotice}</p>}
+              {!pendingVerificationEmail && (
+                <p className="auth-switch">
+                  {authMode === "register" ? t("Already have an account?") : t("New to Jan Sahayak?")}{" "}
+                  <button type="button" onClick={() => {
+                    setAuthMode(authMode === "register" ? "login" : "register");
+                    setAuthError("");
+                    setAuthNotice("");
+                  }}>
+                    {authMode === "register" ? t("Sign in") : t("Create account")}
+                  </button>
+                </p>
+              )}
+              {apiConfigured && (
+                <div className="prototype-warning"><ShieldCheck size={16} /> {t("Passwords are securely hashed by the server. Welfare profile details are not uploaded.")}</div>
+              )}
             </motion.section>
           ) : (
             <motion.section
@@ -834,8 +1106,10 @@ function App() {
                   <span>{t("Family details")} <small>{t("(optional)")}</small></span>
                   <textarea name="familyDetails" rows="3" value={personalProfile.familyDetails} onChange={updatePersonalProfile} placeholder={t("Share only details that may help identify relevant support.")} />
                 </label>
-                <div className="prototype-warning"><ShieldCheck size={16} /> {t("Profile data exists only in this page session and is cleared when you refresh or sign out.")}</div>
-                {profileSaved && <p className="save-confirmation" role="status"><Check size={15} /> {t("Profile updated for this session.")}</p>}
+                <div className="prototype-warning"><ShieldCheck size={16} /> {t("Only your account name and email are stored with your login. Welfare profile details remain in this page session.")}</div>
+                {profileSaveError && <p className="auth-feedback is-error" role="alert">{profileSaveError}</p>}
+                {authError && <p className="auth-feedback is-error" role="alert">{authError}</p>}
+                {profileSaved && <p className="save-confirmation" role="status"><Check size={15} /> {t("Profile updated. Welfare details remain session-only.")}</p>}
                 <div className="profile-actions">
                   {account && <button className="text-button" type="button" onClick={signOut}><LogOut size={15} /> {t("Sign out")}</button>}
                   <button className="primary-button" type="submit">{t("Save profile")} <Check size={16} /></button>
@@ -871,10 +1145,14 @@ function App() {
           <button className="nav-item nav-button" onClick={() => { setScreen(account ? "profile" : "auth"); setAuthMode("register"); }}>
             <UserRound size={18} /> <span>{account ? t("My profile") : t("Sign in / Register")}</span>
           </button>
-          <button className="nav-item nav-button" onClick={() => { setScreen("admin"); setMobileMenuOpen(false); }}>
-            <ShieldCheck size={18} /> <span>Admin panel</span>
-            <span className="nav-count">DEMO</span>
+          <button className="nav-item nav-button" onClick={() => { setScreen("admin-directory"); setMobileMenuOpen(false); }}>
+            <Users size={18} /> <span>{t("Admin details")}</span>
           </button>
+          {account?.role === "admin" && (
+            <button className="nav-item nav-button" onClick={() => { setScreen("admin"); setMobileMenuOpen(false); }}>
+              <ShieldCheck size={18} /> <span>{t("Admin dashboard")}</span>
+            </button>
+          )}
           <button className="nav-item nav-button" onClick={() => setShowInfo(true)}>
             <FileText size={18} /> <span>{t("How it works")}</span>
           </button>
@@ -888,7 +1166,9 @@ function App() {
           <span className="help-decoration" aria-hidden="true">✳</span>
         </div>
         <div className="sidebar-foot">
-          <ShieldCheck size={15} /> {t("Demo only · personal data not saved")}
+          <ShieldCheck size={15} /> {apiConfigured
+            ? t("Secure account login · welfare details are session-only")
+            : t("Authentication setup required")}
         </div>
       </aside>
 
@@ -909,20 +1189,20 @@ function App() {
           </button>
           <div className="breadcrumb">{t("Your space")} <span>/</span> <b>{t("Overview")}</b></div>
           <div className="topbar-actions">
-            <span className="secure-label"><span className="secure-dot" /> {t("Prototype · personal data not saved")}</span>
+            <span className="secure-label"><span className="secure-dot" /> {authStatusLabel}</span>
             <div className="notification-menu">
               <button
                 className="notification-toggle"
                 type="button"
-                aria-label={`${t("Smart notifications")}: ${smartNotifications.length}`}
+                aria-label={`${t("Smart notifications")}: ${unreadNotifications.length} ${t("Unread")}`}
                 aria-expanded={notificationPanelOpen}
                 aria-controls="notification-panel"
                 onClick={() => setNotificationPanelOpen((open) => !open)}
               >
                 <Bell size={17} />
-                {smartNotifications.length > 0 && (
+                {unreadNotifications.length > 0 && (
                   <span className="notification-badge" aria-hidden="true">
-                    {smartNotifications.length > 9 ? "9+" : smartNotifications.length}
+                    {unreadNotifications.length > 9 ? "9+" : unreadNotifications.length}
                   </span>
                 )}
               </button>
@@ -955,6 +1235,7 @@ function App() {
                     {smartNotifications.length > 0 ? (
                       <div className="notification-list" aria-live="polite">
                         {smartNotifications.map((notification) => {
+                          const isRead = readNotificationIds.has(notification.id);
                           const Icon = notification.type === "deadline"
                             ? CalendarDays
                             : notification.type === "checklist"
@@ -963,16 +1244,22 @@ function App() {
                           const copy = getNotificationCopy(notification);
                           return (
                             <button
-                              className={`notification-item notification-${notification.type}`}
+                              className={`notification-item notification-${notification.type} ${isRead ? "is-read" : "is-unread"}`}
                               type="button"
                               key={notification.id}
-                              aria-label={`${copy.title}: ${copy.schemeName}`}
-                              onClick={() => openSchemeDetails(notification.schemeId)}
+                              aria-label={`${copy.title}: ${copy.schemeName} - ${t(isRead ? "Read" : "Unread")}`}
+                              onClick={() => {
+                                setReadNotificationIds((current) =>
+                                  markNotificationAsRead(current, notification.id),
+                                );
+                                openSchemeDetails(notification.schemeId);
+                              }}
                             >
                               <span className="notification-icon"><Icon size={16} /></span>
                               <span className="notification-copy">
                                 <strong>{copy.title}</strong>
                                 <span>{copy.message}</span>
+                                <span className="notification-read-state">{t(isRead ? "Read" : "Unread")}</span>
                               </span>
                               <ArrowRight className="notification-arrow" size={15} />
                             </button>

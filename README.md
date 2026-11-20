@@ -1,6 +1,42 @@
 # Jan Sahayak
 
-A responsive, interactive starter for an AI-personalised government welfare scheme discovery and application assistant.
+A responsive, interactive welfare-scheme discovery and application assistant with MongoDB Atlas-backed account authentication.
+
+## Requirements
+
+- Node.js 20.19 or newer
+- A MongoDB Atlas cluster
+
+## Configure MongoDB Atlas
+
+1. Copy the server environment template:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   If `.env` already contains your Atlas URI and session secret, do not overwrite it; add only any missing settings.
+
+2. In MongoDB Atlas, create a database user, allow your development IP under **Network Access**, then choose **Connect → Drivers** and copy the connection string into `MONGODB_URI` in `.env`. Replace the username, password, and cluster host with your Atlas values; URL-encode special characters in the password. Set `MONGODB_DB_NAME` to the database name you want.
+3. Generate a private session-signing secret and put it in `SESSION_SECRET`:
+
+   ```bash
+   openssl rand -base64 48
+   ```
+
+4. Keep `.env` private. Never add the MongoDB URI or session secret to frontend code, a `VITE_` variable, source control, or a public screenshot.
+
+The `.env.example` contains placeholders only. Authentication stays disabled until valid Atlas settings are supplied.
+
+## Configure email OTP
+
+Account creation sends a six-digit verification code through SMTP. Fill in these fields in the same server-side `.env` file using the SMTP settings from your email provider:
+
+- `SMTP_HOST`, `SMTP_PORT`, and `SMTP_SECURE`
+- `SMTP_USER` and `SMTP_PASS`
+- `EMAIL_FROM` (the sender address permitted by your provider)
+
+Restart `npm run dev` after editing `.env`. Registration remains disabled until SMTP is configured. Codes expire after 10 minutes, can be resent after 60 seconds, and allow five verification attempts. The API stores only a keyed code hash in MongoDB while verification is pending; it does not store the plain code.
 
 ## Run locally
 
@@ -9,62 +45,66 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. Create a production build with `npm run build`.
-Run the unit tests with `npm test`.
+This starts the API on `http://localhost:3001` and the Vite website on `http://localhost:5173`. Vite proxies `/api` requests to the backend. The API connects to Atlas, creates the required indexes, and reports connection/configuration errors in its terminal.
+
+Run tests and create the frontend production build:
+
+```bash
+npm test
+npm run build
+```
+
+## Authentication and administrator setup
+
+- Registration sends an email OTP and creates the account only after successful verification. Sign-in uses the Node/Express API. Passwords are hashed with bcrypt; authentication uses a signed, HTTP-only cookie. The browser never receives the database URI, SMTP credentials, or password hash.
+- New accounts always receive the `user` role. To make the first admin, register and sign in normally, then use Atlas **Data Explorer** to find that record in `jan_sahayak.users` and change only its `role` field to `admin`. The API reads the role from MongoDB on protected requests; public registration cannot assign it.
+- Admins can publish a display name, title, department, and optional public contact under **Admin details**. Only those fields appear in the public directory.
+- Account email and display name are stored in MongoDB. Welfare profile details, including income, disability, household information, and location, remain in the current page session.
+- Scheme edits in the current admin dashboard remain browser-local; they are not shared through MongoDB.
+
+For production, serve the frontend and API on the same site, or proxy `/api` to the API while preserving same-origin requests. Set `APP_ORIGINS` to the exact frontend origin(s), use HTTPS, set `NODE_ENV=production`, and use a strong unique `SESSION_SECRET`. Do not expose MongoDB Atlas to all IP addresses; restrict network access to the application server.
+
+## API routes
+
+- `GET /api/health` — reports whether Atlas and email delivery are configured.
+- `POST /api/auth/register`, `POST /api/auth/verify-email`, `POST /api/auth/resend-otp`
+- `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
+- `PATCH /api/auth/profile` — updates the account display name only.
+- `GET /api/admin-directory` — returns explicitly published public contact fields.
+- `GET /api/admin-directory/me`, `PUT /api/admin-directory/me` — admin-only directory editing.
 
 ## What's included
 
-- Responsive React + Vite app shell with a sidebar, overview, and a filterable scheme dashboard across eight welfare categories.
-- Scheme cards with category, department, benefit/deadline summaries, expandable eligibility and document notes, and official portal links.
-- Scheme detail dialogs with overview, eligibility, an interactive document checklist, step-by-step online/offline application guidance, official portals, department contacts, and next steps after applying.
+- Responsive React + Vite app shell with a sidebar, overview, and filterable scheme dashboard across eight welfare categories.
+- Scheme cards with category, department, benefit/deadline summaries, eligibility and document notes, official portal links, and application guidance.
 - Optional household profile form, search, saved schemes, language selector, and explainer dialog.
-- Profile-match explanation cards that show which broad signals influenced each recommendation, with an explicit official-verification caveat.
 - English, Kannada, and Hindi interface and scheme summaries, plain-language explanations, and Kannada text-to-speech in scheme details.
-- A draggable, keyboard-accessible in-browser Scheme Assistant that answers common questions from the local scheme records, links to official sources, and avoids making eligibility decisions. The launcher starts in the bottom-right and the panel repositions to stay visible.
-- Nearby CSC and government-office search by manually entered Indian city, district, or PIN code, with published contact details and OpenStreetMap directions.
-- Registration/login and profile-management screens for name, date of birth, gender, location, income, occupation, social category, household details, and optional disability status.
-- An in-app notification inbox for exact catalog deadline dates, started-but-incomplete document checklists, and relevant new or changed scheme records.
-- A demo admin panel with browser-local scheme add/edit/delete and clearly marked placeholders for user management, eligibility rules, languages, analytics, and feedback.
-- Framer Motion transitions, CSS illustration, mobile layout, and reduced-motion support.
-- A parallax hero illustration with gently orbiting rings, breathing gradient sphere, floating leaves, particles, sparkles, and a motion-reduced static mode.
-- Dark navy theme with refined purple, magenta, and cyan accents, crisp light text, softly glowing interactive cards, 3D hover effects, and an animated assistant.
-- Sample schemes link to official portals. Scheme descriptions and eligibility notes are illustrative; confirm current requirements with the relevant department.
+- A draggable, keyboard-accessible Scheme Assistant that answers from local scheme records without claiming official eligibility.
+- Nearby CSC and government-office search by manually entered city, district, or PIN code.
+- In-app reminders for exact catalog deadline dates, incomplete document checklists, and relevant local catalog changes.
+- MongoDB Atlas-backed account registration/login, protected user/admin roles, and a public administrator directory.
+- Admin-only dashboard with browser-local scheme add/edit/delete and clearly marked placeholders for unconnected management features.
+- Framer Motion transitions, animated hero illustration, dark navy theme, purple/cyan accents, mobile layout, and reduced-motion support.
 
-Registration, profile management, eligibility screening, chatbot responses, nearby-centre search, document checklist progress, and notifications are **prototype-only**. Notifications are in-app only while the page is open; there is no push, email, or SMS delivery. Deadline alerts require an exact `applicationDeadlineDate` (`YYYY-MM-DD`) in the local scheme record; the current illustrative catalog has no verified date-specific deadlines. Scheme changes are detected by comparing the catalog with a non-personal snapshot in browser storage, and are not live government updates. The app does not store profile details or checklist progress. The chatbot uses deterministic matching against the current local scheme catalog; it does not call an AI service or a live government database. The records are illustrative, not independently verified, and the assistant avoids confirming eligibility. Nearby-centre search asks for explicit consent and sends only the entered town, district, or PIN code to Photon and OpenStreetMap; it does not use GPS or save the query in this app. OpenStreetMap listings and contact details may be incomplete or out of date; use the linked official CSC locator to verify before travelling. Kannada and Hindi copy is simplified informational translation and should be reviewed by native speakers and confirmed with official scheme sources. Kannada speech depends on the voices available in the user's browser/device. Document suggestions are indicative and should be confirmed with the official scheme or local authority. The checker explains which broad profile signals influenced a recommendation and lists official checks, but does not confirm eligibility because verified scheme-specific rules are not connected. A location match is not claimed unless a scheme-specific location rule is configured. Do not enter real passwords or sensitive personal information.
-
-The admin panel is a public demonstration, not a protected administrator account. Scheme edits are saved only in the current browser's `localStorage` and affect only that browser; clearing its site data resets the catalog. User accounts, eligibility-rule editing, translation editing, usage analytics, and feedback storage are not connected. Do not use this prototype to publish unverified scheme details or manage real citizen records.
+Scheme descriptions and eligibility notes are illustrative. Verify current requirements with the relevant government department. The chatbot, nearby-centre search, scheme catalog, notifications, and eligibility explanations are informational and are not connected to a live government database.
 
 ## Project structure
 
 ```text
 .
-├── index.html
+├── .env.example
 ├── package.json
-├── vite.config.js
+├── server/
+│   ├── app.js
+│   ├── app.test.js
+│   ├── email-verification.js
+│   ├── email-verification.test.js
+│   ├── index.js
+│   ├── validation.js
+│   └── validation.test.js
 └── src/
+    ├── api.js
     ├── App.jsx
-    ├── HeroIllustration.jsx
-    ├── AdminDashboard.jsx
-    ├── admin.css
-    ├── admin-catalog.js
-    ├── admin-catalog.test.js
-    ├── chatbot.js
-    ├── chatbot.test.js
-    ├── chat-position.js
-    ├── chat-position.test.js
-    ├── service-centres.js
-    ├── service-centres.test.js
-    ├── data/
-    │   ├── schemes.js
-    │   └── schemes.test.js
-    ├── eligibility.js
-    ├── eligibility.test.js
-    ├── localization.js
-    ├── localization.test.js
-    ├── notifications.js
-    ├── notifications.test.js
-    ├── main.jsx
-    └── styles.css
+    ├── AdminDirectory.jsx
+    └── ...
 ```
-
-The current profile matching is a front-end prototype and does not make an official eligibility decision. Before launch, connect to a secure authentication and data service, verified government scheme data, validate translations, and review privacy, accessibility, and application-submission requirements.

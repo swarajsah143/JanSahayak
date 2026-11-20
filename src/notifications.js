@@ -134,3 +134,12 @@ export function getSmartNotifications({
     (first.type === "deadline" ? first.daysRemaining - second.daysRemaining : 0),
   );
 }
+
+export function getUnreadNotifications(notifications, readNotificationIds) {
+  return notifications.filter((notification) => !readNotificationIds.has(notification.id));
+}
+
+export function markNotificationAsRead(readNotificationIds, notificationId) {
+  if (readNotificationIds.has(notificationId)) return readNotificationIds;
+  return new Set([...readNotificationIds, notificationId]);
+}

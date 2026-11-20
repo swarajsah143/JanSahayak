@@ -80,6 +80,8 @@ test("smart notification labels and guidance are available in Kannada and Hindi"
   for (const key of [
     "Smart notifications",
     "Close notifications",
+    "Read",
+    "Unread",
     "Upcoming application deadline",
     "Incomplete document checklist",
     "New scheme matching your profile",
@@ -95,6 +97,57 @@ test("smart notification labels and guidance are available in Kannada and Hindi"
     "Scheme update alerts compare the demo catalog using a non-personal browser snapshot; they do not track live government changes.",
     "Scheme update tracking is unavailable in this browser.",
     "Mark scheme updates as seen",
+  ]) {
+    assert.notEqual(translate(key, "kn"), key, `Kannada translation is missing: ${key}`);
+    assert.notEqual(translate(key, "hi"), key, `Hindi translation is missing: ${key}`);
+  }
+});
+
+test("MongoDB authentication and public admin-directory labels are localized", () => {
+  for (const key of [
+    "MongoDB Atlas sign-in · welfare details are session-only",
+    "Secure account login · welfare details are session-only",
+    "Authentication setup required",
+    "Checking secure session…",
+    "Account setup needs attention",
+    "Password",
+    "Working…",
+    "Authentication is not configured. Add MongoDB Atlas settings to the server .env file, then restart the app.",
+    "Email verification needs SMTP settings. Add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and EMAIL_FROM to .env, then restart the app.",
+    "Create a secure account with your email and password. Welfare details remain in this page session.",
+    "Passwords are securely hashed by the server. Welfare profile details are not uploaded.",
+    "Verify your email",
+    "Enter the six-digit code sent to your email. It expires in 10 minutes.",
+    "Verification code",
+    "Verify email",
+    "Resend code",
+    "Change email",
+    "A six-digit verification code was sent to your email.",
+    "A new verification code has been sent.",
+    "Could not resend the verification code.",
+    "The verification code is incorrect or expired. Request a new code.",
+    "Only your account name and email are stored with your login. Welfare profile details remain in this page session.",
+    "Profile updated. Welfare details remain session-only.",
+    "Admin details",
+    "Admin dashboard",
+    "Administrator access is required.",
+    "Sign in with an administrator account to open the admin dashboard.",
+    "PUBLIC CONTACTS",
+    "Admin directory",
+    "Public admin contact details are available to everyone. Private account information is never shown here.",
+    "Could not load the admin directory.",
+    "Could not save your public admin profile.",
+    "No public admin contact profiles have been published yet.",
+    "Edit your public admin profile",
+    "Public display name",
+    "Role / title",
+    "Official public contact",
+    "Optional; only use contact details meant for publication",
+    "Admin directory details saved.",
+    "Save public details",
+    "Admin directory requires MongoDB Atlas setup before it can load.",
+    "Loading administrator contacts…",
+    "Saving…",
   ]) {
     assert.notEqual(translate(key, "kn"), key, `Kannada translation is missing: ${key}`);
     assert.notEqual(translate(key, "hi"), key, `Hindi translation is missing: ${key}`);

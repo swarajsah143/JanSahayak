@@ -460,6 +460,10 @@ h1 { margin: 13px 0 10px; color: #24352e; font: 700 clamp(31px, 4vw, 42px)/1.14 
 .auth-switch button { padding: 0; border: 0; color: #477457; background: transparent; font-size: inherit; font-weight: 700; }
 .prototype-warning { display: flex; align-items: flex-start; gap: 8px; padding: 10px 11px; border: 1px solid #f0e5d3; border-radius: 7px; color: #8c744f; background: #fcf8ef; font-size: 9px; line-height: 1.55; }
 .prototype-warning svg { flex: 0 0 auto; margin-top: 1px; color: #b28a52; }
+.auth-feedback { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0; padding: 10px 11px; border: 1px solid; border-radius: 7px; font-size: 10px; line-height: 1.55; overflow-wrap: anywhere; }
+.auth-feedback.is-error { border-color: #efc9c4; color: #9c4e46; background: #fff3f1; }
+.auth-feedback.is-success { border-color: #cae5d3; color: #397153; background: #effaf2; }
+.primary-button:disabled { cursor: not-allowed; opacity: .58; }
 .profile-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px 15px; }
 .family-details-field { margin-top: 14px; }
 .profile-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -467,6 +471,24 @@ h1 { margin: 13px 0 10px; color: #24352e; font: 700 clamp(31px, 4vw, 42px)/1.14 
 .text-button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 0; border: 0; color: #97766d; background: transparent; font-size: 10px; }
 .text-button:hover { color: #a34637; }
 .save-confirmation { display: flex; align-items: center; gap: 6px; margin: 0; color: #4b7a56; font-size: 10px; }
+.admin-directory-page { overflow: auto; }
+.admin-directory-page .account-back { display: inline-flex; align-items: center; gap: 7px; margin: 0; }
+.account-card.admin-directory-card { width: min(900px, 100%); margin: 30px auto; }
+.admin-directory-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap: 12px; }
+.admin-directory-entry { display: grid; grid-template-columns: 39px minmax(0, 1fr); align-content: start; gap: 11px; padding: 15px; border: 1px solid #e6ece4; border-radius: 10px; background: #fff; }
+.admin-directory-entry-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; color: #477457; background: #eaf2e8; }
+.admin-directory-entry h2 { margin: 0 0 4px; color: #32463a; font: 700 14px "Manrope", sans-serif; }
+.admin-directory-entry p { margin: 0 0 7px; color: #64746a; font-size: 11px; }
+.admin-directory-entry span:not(.admin-directory-entry-icon) { display: flex; align-items: center; gap: 5px; color: #718177; font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+.admin-directory-entry .admin-directory-contact { margin-top: 5px; }
+.admin-directory-status, .admin-directory-empty { display: flex; align-items: center; gap: 9px; margin: 12px 0; color: #79877d; font-size: 11px; line-height: 1.6; }
+.admin-directory-empty { padding: 18px; border: 1px dashed #cfd9ce; border-radius: 9px; }
+.admin-directory-empty p { margin: 0; }
+.admin-directory-editor { display: grid; gap: 12px; margin-top: 22px; padding-top: 20px; border-top: 1px solid #e6ece5; }
+.admin-directory-editor-heading { display: flex; align-items: center; gap: 8px; color: #4b7255; }
+.admin-directory-editor-heading h2 { margin: 0; color: #33483a; font: 700 15px "Manrope", sans-serif; }
+.admin-directory-editor .field { font-size: 11px; }
+.admin-directory-editor .field input { min-height: 40px; }
 
 @media (min-width: 1500px) {
   .page-wrap { padding-top: 52px; }
@@ -624,6 +646,7 @@ h1 { margin: 13px 0 10px; color: #24352e; font: 700 clamp(31px, 4vw, 42px)/1.14 
 .notification-copy { display: grid; min-width: 0; gap: 4px; }
 .notification-copy strong { color: #394b3d; font-size: 9px; line-height: 1.4; }
 .notification-copy > span { color: #728075; font-size: 8px; line-height: 1.55; }
+.notification-read-state { width: fit-content; padding: 2px 6px; border-radius: 999px; font-size: 9px; font-weight: 700; line-height: 1.35; }
 .notification-arrow { color: #8a9b8a; }
 .notification-empty { display: grid; justify-items: center; gap: 7px; padding: 22px 18px; text-align: center; }
 .notification-empty-icon { width: 36px; height: 36px; color: #6a8c6b; background: #eef5e9; }

@@ -107,9 +107,9 @@ function getPlaceholderContent(section) {
   const content = {
     users: {
       icon: Users,
-      title: "User accounts are not connected",
-      description: "Sign-in and registration are front-end demonstrations and do not create or save real accounts. There are no user records to view or manage.",
-      note: "A secure server-side identity provider and role checks are required before enabling account administration.",
+      title: "Account management is restricted",
+      description: "User accounts are authenticated by the server. This dashboard does not expose a user list or allow role changes.",
+      note: "Promote or revoke administrator roles only in MongoDB Atlas. Public registration always creates a regular user.",
     },
     eligibility: {
       icon: ShieldCheck,
@@ -469,7 +469,7 @@ export default function AdminDashboard({ catalog, onCatalogSave, onBack, storage
           <span className="brand-mark"><ShieldCheck size={20} /></span>
           <span>jan<span className="brand-light">sahayak</span></span>
         </a>
-        <p className="admin-sidebar-label">ADMIN CONSOLE · DEMO</p>
+        <p className="admin-sidebar-label">ADMIN CONSOLE · ROLE VERIFIED</p>
         <nav className="admin-nav" aria-label="Admin navigation">
           {adminSections.map(({ id, label, icon: Icon }) => (
             <button
@@ -483,7 +483,7 @@ export default function AdminDashboard({ catalog, onCatalogSave, onBack, storage
             </button>
           ))}
         </nav>
-        <div className="admin-sidebar-note"><ShieldAlert size={15} /> Demo only. This screen is not protected by admin sign-in.</div>
+        <div className="admin-sidebar-note"><ShieldAlert size={15} /> The server verifies this admin session. Scheme edits still save only in this browser.</div>
       </aside>
 
       <main className="admin-main">
@@ -493,7 +493,7 @@ export default function AdminDashboard({ catalog, onCatalogSave, onBack, storage
           </button>
           <div className="admin-breadcrumb">Jan Sahayak <span>/</span> <b>{activeSectionLabel}</b></div>
           <div className="admin-topbar-actions">
-            <span className="admin-demo-badge"><span /> Prototype mode</span>
+            <span className="admin-demo-badge"><span /> Admin role verified</span>
             <button className="admin-exit-button" type="button" onClick={onBack}><ArrowLeft size={15} /> Back to website</button>
           </div>
         </header>
@@ -502,7 +502,7 @@ export default function AdminDashboard({ catalog, onCatalogSave, onBack, storage
             <div>
               <span className="admin-eyebrow">JAN SAHAYAK · ADMINISTRATION</span>
               <h1>{activeSection === "overview" ? "Admin dashboard" : activeSectionLabel}</h1>
-              <p>Manage the demo scheme directory and review which admin features still need a secure backend.</p>
+              <p>Manage the local scheme catalog and review features that are not yet connected to shared data.</p>
             </div>
           </div>
           {storageError && (
@@ -512,7 +512,7 @@ export default function AdminDashboard({ catalog, onCatalogSave, onBack, storage
           )}
           <div className="admin-prototype-banner">
             <ShieldAlert size={17} />
-            <p><strong>Prototype admin panel</strong> — changes to schemes are stored only in this browser. User accounts, analytics, eligibility rules, translations and feedback are not connected to a backend.</p>
+            <p><strong>Protected admin session</strong> — the server verifies your role. Scheme edits are still stored only in this browser; analytics, eligibility rules, translations and feedback are not connected to shared data.</p>
           </div>
           {currentSection}
         </div>

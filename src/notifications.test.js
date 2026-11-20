@@ -5,6 +5,8 @@ import {
   createSchemeCatalogSnapshot,
   getSchemeCatalogChanges,
   getSmartNotifications,
+  getUnreadNotifications,
+  markNotificationAsRead,
   readSchemeCatalogChanges,
   SCHEME_CATALOG_STORAGE_KEY,
 } from "./notifications.js";
@@ -122,4 +124,17 @@ test("relevant catalog additions and edits become actionable notifications", () 
     { type: "new-scheme", schemeId: "farmers" },
     { type: "scheme-updated", schemeId: "housing" },
   ]);
+});
+
+test("reading a notification removes only it from the unread list", () => {
+  const notifications = [
+    { id: "checklist:farmers" },
+    { id: "deadline:farmers:2026-12-10" },
+  ];
+  const previouslyRead = new Set();
+  const readIds = markNotificationAsRead(previouslyRead, notifications[0].id);
+
+  assert.deepEqual(getUnreadNotifications(notifications, readIds), [notifications[1]]);
+  assert.deepEqual([...previouslyRead], []);
+  assert.equal(markNotificationAsRead(readIds, notifications[0].id), readIds);
 });
