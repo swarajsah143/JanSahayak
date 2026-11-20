@@ -231,19 +231,19 @@ h1 { color: #f0f3ff; }
 .modal-steps b { color: #e2eafa; }
 .scheme-detail-heading { border-color: var(--line); }
 .scheme-detail-heading p svg, .detail-section h3 svg { color: #71ddeb; }
-.scheme-detail-overview { border-color: rgba(34, 211, 238, .2); background: rgba(34, 211, 238, .07); }
-.scheme-detail-overview span, .scheme-detail-contact strong { color: #83dfea; }
-.scheme-detail-overview p { color: #d1dced; }
-.simple-explanation { border-color: #9a5ef3; background: rgba(168, 85, 247, .11); }
+.scheme-detail-contact strong { color: #83dfea; }
+.simple-explanation { border-color: #9a5ef3; background: linear-gradient(110deg, rgba(168, 85, 247, .16), rgba(34, 211, 238, .09)); box-shadow: 0 10px 24px rgba(68, 51, 135, .12); }
 .simple-explanation span { color: #d7b4ff; }
 .simple-explanation p { color: #d0daec; }
-.detail-section { border-color: var(--line); background: rgba(14, 24, 44, .78); }
+.detail-section { border-color: rgba(168, 85, 247, .18); background: linear-gradient(145deg, rgba(18, 30, 55, .88), rgba(11, 20, 38, .92)); box-shadow: inset 0 1px rgba(255,255,255,.035), 0 8px 20px rgba(2, 6, 18, .16); }
 .detail-section h3 { color: #e1e9f9; }
 .detail-section p, .detail-section li { color: #b1bfd5; }
 .application-guidance { border-color: rgba(34, 211, 238, .2); background: linear-gradient(145deg, rgba(21, 43, 69, .8), rgba(24, 22, 55, .7)); }
+.application-guidance-heading { color: #e3d2ff; }
 .application-guidance-heading h3 { color: #e3d2ff; }
-.application-guidance-heading p { color: #b0bfd5; }
+.application-guidance-heading-copy > span { color: #b0bfd5; }
 .application-guide-card { border-color: var(--line); background: rgba(8, 16, 32, .68); }
+.application-guide-card:hover { border-color: rgba(34, 211, 238, .32); box-shadow: 0 10px 24px rgba(28, 73, 145, .15); }
 .application-guide-icon { color: #d8c0ff; background: rgba(168, 85, 247, .16); }
 .application-guide-card h4 { color: #e0eafa; }
 .application-guide-card p { color: #b4c1d6; }
@@ -427,4 +427,79 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .welcome-art .art-circle-one, .welcome-art .art-circle-two { rotate: 0deg; }
   .welcome-art .art-leaf { translate: 0 0; }
   .welcome-art .art-caption { opacity: 1; }
+}
+
+.eyebrow, .section-kicker, .sidebar-label, .admin-eyebrow, .admin-sidebar-label { font-size: 10px; }
+.sidebar-foot, .secure-label, .privacy-note, .page-footer, .admin-sidebar-note { font-size: 10px; }
+.welcome-copy { font-size: 13px; }
+.stat-item strong { font-size: 11px; }
+.stat-item span, .profile-intro p, .field, .account-form .field { font-size: 11px; }
+.field select, .field input, .field textarea, .account-form .field input, .account-form .field select, .account-form .field textarea { font-size: 12px; }
+.field small, .account-card .section-kicker, .account-form .field small { font-size: 10px; }
+.primary-button, .account-menu-button, .text-link, .category-tab { font-size: 11px; }
+.results-note, .screening-summary-title, .profile-match-card h4 { font-size: 11px; }
+.results-note button, .profile-match-card ul, .profile-match-disclaimer { font-size: 10px; }
+.screening-counts { font-size: 9px; }
+.screening-counts b { font-size: 11px; }
+.scheme-category, .recommended-badge, .eligibility-status { font-size: 9px; }
+.scheme-department, .scheme-deadline, .scheme-info summary, .scheme-info summary b,
+.scheme-card-info > div > span, .relevance-label span, .verification-checks > span,
+.relevance-label b, .screening-more summary { font-size: 9px; }
+.scheme-description, .scheme-card-info p, .scheme-card-info ul, .screening-reasons,
+.verification-checks ul, .official-note p { font-size: 11px; }
+.scheme-link { font-size: 10px; }
+.service-centres-heading p, .service-centre-area-field { font-size: 11px; }
+.service-centres-form-footer p, .service-centres-source-note, .service-centres-source-note a,
+.service-centre-status, .service-centre-error p, .service-centres-results-heading > div > span,
+.service-centre-address, .service-centre-contacts p, .service-centre-directions,
+.service-centre-empty p { font-size: 10px; }
+.service-centre-card-meta, .service-centre-type, .service-centre-attribution { font-size: 9px; }
+.scheme-detail-heading p, .detail-section p, .detail-section li, .scheme-detail-contact p { font-size: 14px; }
+.scheme-detail-heading h2 { font-size: 24px; }
+.scheme-detail-heading .section-kicker { font-size: 12px; }
+.simple-explanation p { font-size: 16px; }
+.simple-explanation span, .checklist-heading .section-kicker { font-size: 12px; }
+.detail-section h3 { font-size: 16px; }
+.application-guidance-heading h3 { font-size: 17px; }
+.application-guidance-heading-copy > span { font-size: 13px; }
+.application-guide-card h4 { font-size: 15px; }
+.application-guide-card p { font-size: 13px; }
+.application-portal-link { font-size: 12px; }
+.application-portal-link small, .checklist-progress-count span, .document-guidance p span { font-size: 10px; }
+.checklist-heading h3 { font-size: 20px; }
+.checklist-heading p { font-size: 13px; }
+.document-title strong { font-size: 14px; }
+.document-title small { font-size: 10px; }
+.document-guidance p { font-size: 12px; }
+.checklist-footnote, .narration-hint, .narration-status, .scheme-detail-disclaimer { font-size: 12px; }
+.scheme-detail-contact strong { font-size: 13px; }
+.detail-portal-link { font-size: 13px; }
+.scheme-chat-heading p, .scheme-chat-disclaimer p, .scheme-chat-prompts > span,
+.chat-scheme-result-content > span, .chat-scheme-result-actions a, .chat-scheme-result-actions button { font-size: 9px; }
+.scheme-chat-welcome > p, .scheme-chat-message > p { font-size: 11px; }
+.scheme-chat-prompts button, .chat-scheme-result-content > strong { font-size: 10px; }
+.scheme-chat-form input { font-size: 12px; }
+.notification-panel-header p, .notification-copy > span, .notification-empty p { font-size: 10px; }
+.notification-copy strong, .notification-error { font-size: 10px; }
+.notification-empty strong { font-size: 11px; }
+.admin-page-heading p, .admin-placeholder-card > p, .admin-inline-note,
+.admin-prototype-banner, .admin-storage-warning, .admin-section-heading p,
+.admin-metric-card small { font-size: 10px; }
+.admin-overview-links button, .admin-primary-button, .admin-secondary-button,
+.admin-field, .admin-status-message { font-size: 10px; }
+.admin-field input, .admin-field select, .admin-field textarea, .admin-search input { font-size: 11px; }
+.admin-catalog-toolbar, .admin-scheme-category, .admin-scheme-row p,
+.admin-scheme-row small, .admin-field small, .admin-form-hint { font-size: 9px; }
+
+@media (max-width: 760px) {
+  .scheme-detail-modal { width: min(100%, 680px); max-height: 92vh; max-height: 92dvh; padding: 22px 18px; }
+  .scheme-detail-heading { gap: 12px; padding-right: 34px; }
+  .scheme-detail-heading .scheme-icon { width: 44px; height: 44px; flex-basis: 44px; }
+  .scheme-detail-heading h2 { font-size: 21px; }
+  .scheme-detail-heading p { font-size: 13px; }
+  .simple-explanation p { font-size: 15px; }
+  .scheme-detail-grid { grid-template-columns: 1fr; }
+  .detail-section-steps { grid-column: auto; }
+  .detail-section-steps ol { grid-template-columns: 1fr; }
+  .application-guidance-grid, .checklist-items { grid-template-columns: 1fr; }
 }

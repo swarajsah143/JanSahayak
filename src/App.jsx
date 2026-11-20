@@ -5,6 +5,7 @@ import { evaluateSchemeEligibility, getEligibilityStatusLabel } from "./eligibil
 import { answerSchemeQuestion } from "./chatbot.js";
 import AdminDashboard from "./AdminDashboard.jsx";
 import { readAdminSchemeCatalog, writeAdminSchemeCatalog } from "./admin-catalog.js";
+import { readSavedSchemes, writeSavedSchemes } from "./saved-schemes.js";
 import { categories, schemes as defaultSchemes } from "./data/schemes.js";
 import { localizeScheme, translate } from "./localization.js";
 import HeroIllustration from "./HeroIllustration.jsx";
@@ -109,7 +110,14 @@ function App() {
   const [language, setLanguage] = useState("en");
   const [hasChecked, setHasChecked] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [saved, setSaved] = useState([]);
+  const [saved, setSaved] = useState(() => {
+    try {
+      return typeof window === "undefined" ? [] : readSavedSchemes(window.localStorage);
+    } catch (error) {
+      console.error("Could not read saved schemes.", error);
+      return [];
+    }
+  });
   const [showInfo, setShowInfo] = useState(false);
   const [selectedSchemeId, setSelectedSchemeId] = useState(null);
   const [chatOpen, setChatOpen] = useState(false);
@@ -394,9 +402,15 @@ function App() {
   };
 
   const toggleSaved = (id) => {
-    setSaved((current) =>
-      current.includes(id) ? current.filter((savedId) => savedId !== id) : [...current, id],
-    );
+    const nextSaved = saved.includes(id)
+      ? saved.filter((savedId) => savedId !== id)
+      : [...saved, id];
+    setSaved(nextSaved);
+    try {
+      writeSavedSchemes(nextSaved, window.localStorage);
+    } catch (error) {
+      console.error("Could not persist saved schemes.", error);
+    }
   };
 
   const openSchemeDetails = (id) => {
@@ -1194,6 +1208,7 @@ function App() {
                 {visibleSchemes.map((scheme, index) => {
                   const displayScheme = localizeScheme(scheme, language);
                   const Icon = displayScheme.icon;
+                  const isSaved = saved.includes(scheme.id);
                   return (
                     <motion.article
                       className="scheme-card"
@@ -1213,13 +1228,15 @@ function App() {
                       <div className="scheme-card-top">
                         <div className={`scheme-icon ${scheme.tone}`}><Icon size={25} /></div>
                         <button
-                          className={`save-button ${saved.includes(scheme.id) ? "is-saved" : ""}`}
-                          aria-label={saved.includes(scheme.id)
+                          type="button"
+                          className={`save-button ${isSaved ? "is-saved" : ""}`}
+                          aria-pressed={isSaved}
+                          aria-label={isSaved
                             ? `${t("Remove from saved schemes")} ${displayScheme.name}`
                             : `${t("Save scheme")} ${displayScheme.name}`}
                           onClick={() => toggleSaved(scheme.id)}
                         >
-                          <Heart size={16} fill={saved.includes(scheme.id) ? "currentColor" : "none"} />
+                          <Heart size={16} fill={isSaved ? "currentColor" : "none"} />
                         </button>
                       </div>
                       <div className="scheme-card-meta">
@@ -1518,10 +1535,6 @@ function App() {
                   <p><Building2 size={14} /> {selectedScheme.department}</p>
                 </div>
               </div>
-              <div className="scheme-detail-overview">
-                <span>{t("OVERVIEW")}</span>
-                <p>{selectedScheme.overview}</p>
-              </div>
               <section className="simple-explanation">
                 <span>{t("In simple words")}</span>
                 <p>{selectedScheme.simpleExplanation}</p>
@@ -1543,20 +1556,19 @@ function App() {
                   <h3><CalendarDays size={15} /> {t("Application deadline")}</h3>
                   <p>{selectedScheme.applicationDeadline}</p>
                 </section>
-                <section className="detail-section">
-                  <h3><FileText size={15} /> {t("Required documents")}</h3>
-                  <ul>{selectedScheme.requiredDocuments.map((document) => <li key={document.id}>{document.name} — {document.requirementLabel}</li>)}</ul>
-                </section>
-                <section className="detail-section">
+                <section className="detail-section detail-section-steps">
                   <h3>{t("How to apply")}</h3>
                   <ol>{selectedScheme.applicationSteps.map((step) => <li key={step}>{step}</li>)}</ol>
                 </section>
               </div>
-              <section className="application-guidance" aria-labelledby="application-guidance-title">
-                <div className="application-guidance-heading">
-                  <h3 id="application-guidance-title">{t("Application guidance")}</h3>
-                  <p>{t("Choose the official route available in your area. Application channels can change.")}</p>
-                </div>
+              <details className="application-guidance" aria-labelledby="application-guidance-title">
+                <summary className="application-guidance-heading">
+                  <span className="application-guidance-heading-copy">
+                    <h3 id="application-guidance-title">{t("Application guidance")}</h3>
+                    <span>{t("Choose the official route available in your area. Application channels can change.")}</span>
+                  </span>
+                  <ChevronDown size={18} aria-hidden="true" />
+                </summary>
                 <div className="application-guidance-grid">
                   <article className="application-guide-card">
                     <div className="application-guide-icon"><ExternalLink size={16} /></div>
@@ -1582,7 +1594,7 @@ function App() {
                     <p>{selectedScheme.applicationGuidance.afterSubmission}</p>
                   </article>
                 </div>
-              </section>
+              </details>
               <section className="document-checklist" aria-labelledby="document-checklist-title">
                 <div className="checklist-heading">
                   <div>
