@@ -65,6 +65,7 @@ function createTestDatabase(initialUsers = []) {
         (query._id && !verification._id.equals(query._id)) ||
         (query.codeHash && verification.codeHash !== query.codeHash) ||
         (query.attempts !== undefined && verification.attempts !== query.attempts) ||
+        (query.deliveryStatus !== undefined && verification.deliveryStatus !== query.deliveryStatus) ||
         (query.lastSentAt && verification.lastSentAt.getTime() !== query.lastSentAt.getTime()) ||
         (query.expiresAt?.$gt && verification.expiresAt <= query.expiresAt.$gt)) {
         return { matchedCount: 0 };
@@ -120,6 +121,21 @@ async function startTestServer(t, app) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 
+async function waitForVerificationStatus(baseUrl, email, expectedStatus) {
+  const deadline = Date.now() + 2000;
+  let status;
+  while (Date.now() < deadline) {
+    const response = await fetch(
+      `${baseUrl}/api/auth/verification-status?email=${encodeURIComponent(email)}`,
+    );
+    assert.equal(response.status, 200);
+    ({ status } = await response.json());
+    if (status === expectedStatus) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.equal(status, expectedStatus, `email delivery status did not become ${expectedStatus}`);
+}
+
 test("registration creates a user only after email verification and never accepts a client role", async (t) => {
   const db = createTestDatabase();
   const { transport, sentMessages } = createTestMailTransport();
@@ -150,6 +166,7 @@ test("registration creates a user only after email verification and never accept
     verificationRequired: true,
     email: "citizen@example.org",
   });
+  await waitForVerificationStatus(baseUrl, "citizen@example.org", "sent");
   assert.equal(db.usersById.size, 0);
   const pendingVerification = db.verificationsByEmail.get("citizen@example.org");
   assert.ok(pendingVerification);
@@ -181,6 +198,62 @@ test("registration creates a user only after email verification and never accept
   assert.equal((await restored.json()).account.id, account.id);
 });
 
+test("registration returns before SMTP finishes and reports delivery state", async (t) => {
+  const db = createTestDatabase();
+  const sentMessages = [];
+  let markSendStarted;
+  let finishSend;
+  const sendStarted = new Promise((resolve) => { markSendStarted = resolve; });
+  const sendGate = new Promise((resolve) => { finishSend = resolve; });
+  const app = createApp({
+    db,
+    sessionSecret,
+    emailTransport: {
+      sendMail: async (message) => {
+        sentMessages.push(message);
+        markSendStarted();
+        await sendGate;
+      },
+    },
+    emailFrom: "Jan Sahayak <no-reply@example.org>",
+  });
+  const baseUrl = await startTestServer(t, app);
+  const registrationRequest = fetch(`${baseUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: "citizen@example.org",
+      fullName: "Asha Rao",
+      password: "a-secure-password",
+    }),
+  });
+  await sendStarted;
+
+  let response;
+  let deliveryStatusResponse;
+  let timeoutId;
+  try {
+    response = await Promise.race([
+      registrationRequest,
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error("Registration waited for SMTP delivery.")), 1500);
+      }),
+    ]);
+    deliveryStatusResponse = await fetch(
+      `${baseUrl}/api/auth/verification-status?email=${encodeURIComponent("citizen@example.org")}`,
+    );
+  } finally {
+    clearTimeout(timeoutId);
+    finishSend();
+    await registrationRequest;
+  }
+
+  assert.equal(response.status, 202);
+  assert.deepEqual(await deliveryStatusResponse.json(), { status: "sending" });
+  await waitForVerificationStatus(baseUrl, "citizen@example.org", "sent");
+  assert.equal(sentMessages.length, 1);
+});
+
 test("verification limits code guesses and resending rotates the code", async (t) => {
   const db = createTestDatabase();
   const { transport, sentMessages } = createTestMailTransport();
@@ -200,6 +273,7 @@ test("verification limits code guesses and resending rotates the code", async (t
       password: "a-secure-password",
     }),
   });
+  await waitForVerificationStatus(baseUrl, "citizen@example.org", "sent");
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const response = await fetch(`${baseUrl}/api/auth/verify-email`, {
@@ -226,6 +300,7 @@ test("verification limits code guesses and resending rotates the code", async (t
     body: JSON.stringify({ email: "citizen@example.org" }),
   });
   assert.equal(resent.status, 200);
+  await waitForVerificationStatus(baseUrl, "citizen@example.org", "sent");
   assert.equal(sentMessages.length, 2);
 
   const oldCode = sentMessages[0].text.match(/\b\d{6}\b/)[0];
@@ -334,7 +409,7 @@ test("registration clearly reports when SMTP delivery is not configured", async 
   assert.equal((await response.json()).code, "EMAIL_NOT_CONFIGURED");
 });
 
-test("failed email delivery removes the pending registration and reports an error", async (t) => {
+test("failed email delivery is reported and allows the pending registration to retry", async (t) => {
   const db = createTestDatabase();
   const { transport } = createTestMailTransport(new Error("SMTP credentials rejected"));
   const app = createApp({
@@ -354,8 +429,9 @@ test("failed email delivery removes the pending registration and reports an erro
     }),
   });
 
-  assert.equal(response.status, 503);
-  assert.equal(db.verificationsByEmail.size, 0);
+  assert.equal(response.status, 202);
+  await waitForVerificationStatus(baseUrl, "citizen@example.org", "failed");
+  assert.equal(db.verificationsByEmail.size, 1);
   assert.equal(db.usersById.size, 0);
 });
 

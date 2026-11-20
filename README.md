@@ -36,7 +36,7 @@ Account creation sends a six-digit verification code through SMTP. Fill in these
 - `SMTP_USER` and `SMTP_PASS`
 - `EMAIL_FROM` (the sender address permitted by your provider)
 
-The API reuses up to three SMTP connections to avoid a new connection and authentication handshake for every code. Restart `npm run dev` after editing `.env`. Registration remains disabled until SMTP is configured. Codes expire after 10 minutes, can be resent after 60 seconds, and allow five verification attempts. The API stores only a keyed code hash in MongoDB while verification is pending; it does not store the plain code. SMTP providers control final delivery time, so use a transactional email provider with a nearby region if messages still arrive slowly.
+Registration returns as soon as the OTP request is saved; email delivery continues in the API background, and the signup page checks delivery status so failures can be retried. The API reuses up to three SMTP connections to avoid a new connection and authentication handshake for every code. Keep the Express API on a persistent Node.js host; a static Vercel deployment only serves the frontend and does not run `server/index.js`. Set the Vercel `VITE_API_URL` to the deployed API origin, and deploy/restart the API after changing server code or environment variables. Codes expire after 10 minutes, can be resent after 60 seconds, and allow five verification attempts. The API stores only a keyed code hash in MongoDB while verification is pending; it does not store the plain code. SMTP providers control final delivery time, so use a transactional email provider with a nearby region if messages still arrive slowly.
 
 ## Run locally
 

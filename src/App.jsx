@@ -161,6 +161,7 @@ function App() {
   const [apiConfigured, setApiConfigured] = useState(false);
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+  const [emailDeliveryAttempt, setEmailDeliveryAttempt] = useState(0);
   const [authStatus, setAuthStatus] = useState("checking");
   const [authError, setAuthError] = useState("");
   const [authNotice, setAuthNotice] = useState("");
@@ -246,6 +247,47 @@ function App() {
       active = false;
     };
   }, [t]);
+
+  useEffect(() => {
+    if (!pendingVerificationEmail) return undefined;
+
+    let active = true;
+    let timeoutId;
+    let checks = 0;
+    const checkDeliveryStatus = async () => {
+    try {
+      const query = new URLSearchParams({ email: pendingVerificationEmail });
+      const { status } = await apiRequest(`/auth/verification-status?${query}`);
+      if (!active) return;
+      if (status === "sent") {
+        setAuthNotice(t("A six-digit verification code was sent to your email."));
+        return;
+      }
+      if (status === "failed" || status === "expired") {
+        setAuthNotice("");
+        setAuthError(t("Could not send the verification email. Please try again."));
+        return;
+      }
+    } catch (error) {
+      console.error("Could not check the email verification delivery status.", error);
+    }
+
+    checks += 1;
+    if (checks >= 30) {
+      if (active) {
+        setAuthNotice(t("Your verification email is taking longer than usual. Check your inbox in a moment."));
+      }
+      return;
+    }
+    timeoutId = window.setTimeout(() => { void checkDeliveryStatus(); }, 2000);
+    };
+
+    void checkDeliveryStatus();
+    return () => {
+    active = false;
+    window.clearTimeout(timeoutId);
+    };
+  }, [pendingVerificationEmail, emailDeliveryAttempt, t]);
 
   useEffect(() => {
     const updateViewportSize = () => {
@@ -693,7 +735,8 @@ function App() {
           body: JSON.stringify({ email, password, fullName: enteredName }),
         });
         setPendingVerificationEmail(verificationEmail);
-        setAuthNotice(t("A six-digit verification code was sent to your email."));
+        setAuthNotice(t("Sending your verification code…"));
+        setEmailDeliveryAttempt((attempt) => attempt + 1);
         form.reset();
         return;
       }
@@ -753,7 +796,8 @@ function App() {
         method: "POST",
         body: JSON.stringify({ email: pendingVerificationEmail }),
       });
-      setAuthNotice(t("A new verification code has been sent."));
+      setAuthNotice(t("Sending your verification code…"));
+      setEmailDeliveryAttempt((attempt) => attempt + 1);
     } catch (error) {
       console.error("Could not resend the email verification code.", error);
       setAuthError(error instanceof Error ? error.message : t("Could not resend the verification code."));

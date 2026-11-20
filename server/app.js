@@ -27,6 +27,7 @@ import {
 const COOKIE_NAME = "jan_sahayak_session";
 const TOKEN_ISSUER = "jan-sahayak";
 const TOKEN_LIFETIME_SECONDS = 7 * 24 * 60 * 60;
+const EMAIL_DELIVERY_STALE_MS = 60 * 1000;
 const SETUP_MESSAGE = "Set MONGODB_URI and SESSION_SECRET in the server .env file, then restart the API.";
 const EMAIL_SETUP_MESSAGE = "Email verification requires SMTP settings in the server .env file.";
 
@@ -157,6 +158,33 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
     });
   }
 
+  function sendVerificationEmailInBackground(email, code, verificationId, codeHash) {
+    void (async () => {
+      let deliveryStatus;
+      try {
+        await sendVerificationEmail(email, code);
+        deliveryStatus = "sent";
+      } catch (error) {
+        deliveryStatus = "failed";
+        console.error("Could not send the email verification code.", error.message);
+      }
+
+      try {
+        await emailVerifications.updateOne(
+          { _id: verificationId, codeHash },
+          {
+            $set: {
+              deliveryStatus,
+              deliveryStatusAt: new Date(),
+            },
+          },
+        );
+      } catch (error) {
+        console.error("Could not save the email verification delivery status.", error.message);
+      }
+    })();
+  }
+
   async function findSessionUser(request, response) {
     const token = request.cookies[COOKIE_NAME];
     if (!token) return null;
@@ -222,6 +250,54 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
     }
   });
 
+  app.get("/api/auth/verification-status", async (request, response, next) => {
+    try {
+      const email = normalizeEmailAddress({ email: request.query.email });
+      const now = new Date();
+      const pendingVerification = await emailVerifications.findOne({
+        email,
+        expiresAt: { $gt: now },
+      });
+
+      if (!pendingVerification) {
+        response.json({ status: "expired" });
+        return;
+      }
+
+      let status = pendingVerification.deliveryStatus ?? "sent";
+      const deliveryStatusAt = pendingVerification.deliveryStatusAt ?? pendingVerification.lastSentAt;
+      if (status === "sending" &&
+        now.getTime() - deliveryStatusAt.getTime() > EMAIL_DELIVERY_STALE_MS) {
+        const staleUpdate = await emailVerifications.updateOne(
+          {
+            _id: pendingVerification._id,
+            codeHash: pendingVerification.codeHash,
+            deliveryStatus: "sending",
+          },
+          {
+            $set: {
+              deliveryStatus: "failed",
+              deliveryStatusAt: now,
+            },
+          },
+        );
+        if (staleUpdate.matchedCount === 1) {
+          status = "failed";
+        } else {
+          const latestVerification = await emailVerifications.findOne({
+            email,
+            expiresAt: { $gt: now },
+          });
+          status = latestVerification?.deliveryStatus ?? "sent";
+        }
+      }
+
+      response.json({ status });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/auth/register", authLimiter, async (request, response, next) => {
     try {
       if (!emailConfigured) {
@@ -258,6 +334,8 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
         attempts: 0,
         expiresAt: new Date(now.getTime() + EMAIL_CODE_LIFETIME_MS),
         lastSentAt: now,
+        deliveryStatus: "sending",
+        deliveryStatusAt: now,
         createdAt: now,
       };
       let verificationId;
@@ -272,15 +350,7 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
         throw error;
       }
 
-      try {
-        await sendVerificationEmail(email, code);
-      } catch (error) {
-        await emailVerifications.deleteOne({ _id: verificationId });
-        console.error("Could not send the email verification code.", error.message);
-        response.status(503).json({ error: "Could not send the verification email. Check SMTP settings and try again." });
-        return;
-      }
-
+      sendVerificationEmailInBackground(email, code, verificationId, pendingUser.codeHash);
       response.status(202).json({ verificationRequired: true, email });
     } catch (error) {
       next(error);
@@ -384,7 +454,8 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
         });
         return;
       }
-      if (now.getTime() - pendingUser.lastSentAt.getTime() < EMAIL_CODE_RESEND_DELAY_MS) {
+      if (pendingUser.deliveryStatus !== "failed" &&
+        now.getTime() - pendingUser.lastSentAt.getTime() < EMAIL_CODE_RESEND_DELAY_MS) {
         response.status(429).json({ error: "Please wait before requesting another code." });
         return;
       }
@@ -404,7 +475,14 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
           lastSentAt: pendingUser.lastSentAt,
         },
         {
-          $set: { codeHash, expiresAt, attempts: 0, lastSentAt: now },
+          $set: {
+            codeHash,
+            expiresAt,
+            attempts: 0,
+            lastSentAt: now,
+            deliveryStatus: "sending",
+            deliveryStatusAt: now,
+          },
         },
       );
       if (update.matchedCount !== 1) {
@@ -412,30 +490,8 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
         return;
       }
 
-      try {
-        await sendVerificationEmail(email, code);
-      } catch (error) {
-        try {
-          await emailVerifications.updateOne(
-            { _id: pendingUser._id, codeHash },
-            {
-              $set: {
-                codeHash: pendingUser.codeHash,
-                expiresAt: pendingUser.expiresAt,
-                attempts: pendingUser.attempts,
-                lastSentAt: pendingUser.lastSentAt,
-              },
-            },
-          );
-        } catch (rollbackError) {
-          console.error("Could not restore the pending email verification after delivery failed.", rollbackError);
-        }
-        console.error("Could not resend the email verification code.", error.message);
-        response.status(503).json({ error: "Could not send the verification email. Check SMTP settings and try again." });
-        return;
-      }
-
-      response.json({ message: "A new verification code has been sent." });
+      sendVerificationEmailInBackground(email, code, pendingUser._id, codeHash);
+      response.json({ message: "A new verification code is being sent." });
     } catch (error) {
       next(error);
     }
