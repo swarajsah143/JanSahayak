@@ -7,6 +7,7 @@ import AdminDashboard from "./AdminDashboard.jsx";
 import { readAdminSchemeCatalog, writeAdminSchemeCatalog } from "./admin-catalog.js";
 import { categories, schemes as defaultSchemes } from "./data/schemes.js";
 import { localizeScheme, translate } from "./localization.js";
+import HeroIllustration from "./HeroIllustration.jsx";
 import {
   searchNearbyServiceCentres,
   ServiceCentreSearchError,
@@ -32,7 +33,6 @@ import {
   Heart,
   Home,
   Landmark,
-  Leaf,
   LogIn,
   LogOut,
   Mail,
@@ -1022,15 +1022,7 @@ function App() {
                 {t("Start with a few details — we’ll help with the rest.")}
               </p>
             </div>
-            <div className="welcome-art" aria-hidden="true">
-              <div className="art-sun" />
-              <div className="art-circle art-circle-one" />
-              <div className="art-circle art-circle-two" />
-              <div className="art-leaf leaf-one"><Leaf size={31} /></div>
-              <div className="art-leaf leaf-two"><Leaf size={23} /></div>
-              <div className="art-sparkle"><Sparkles size={18} /></div>
-              <span className="art-caption">{t("a brighter")}<br />{t("way forward")}</span>
-            </div>
+            <HeroIllustration firstLine={t("a brighter")} secondLine={t("way forward")} />
           </motion.section>
 
           <section className="stats-row" aria-label={t("About this service")}>

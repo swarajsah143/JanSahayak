@@ -26,6 +26,7 @@ Run the unit tests with `npm test`.
 - An in-app notification inbox for exact catalog deadline dates, started-but-incomplete document checklists, and relevant new or changed scheme records.
 - A demo admin panel with browser-local scheme add/edit/delete and clearly marked placeholders for user management, eligibility rules, languages, analytics, and feedback.
 - Framer Motion transitions, CSS illustration, mobile layout, and reduced-motion support.
+- A parallax hero illustration with gently orbiting rings, breathing gradient sphere, floating leaves, particles, sparkles, and a motion-reduced static mode.
 - Dark navy theme with refined purple, magenta, and cyan accents, crisp light text, softly glowing interactive cards, 3D hover effects, and an animated assistant.
 - Sample schemes link to official portals. Scheme descriptions and eligibility notes are illustrative; confirm current requirements with the relevant department.
 
@@ -42,6 +43,7 @@ The admin panel is a public demonstration, not a protected administrator account
 ├── vite.config.js
 └── src/
     ├── App.jsx
+    ├── HeroIllustration.jsx
     ├── AdminDashboard.jsx
     ├── admin.css
     ├── admin-catalog.js

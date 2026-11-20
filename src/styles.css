@@ -85,7 +85,7 @@ a { color: inherit; text-decoration: none; }
 .mobile-menu-button { display: none; border: 0; color: var(--ink); background: transparent; }
 .page-wrap { width: min(1120px, 100%); margin: 0 auto; padding: 42px 5.2% 20px; }
 
-.welcome-row { position: relative; display: flex; min-height: 185px; align-items: center; justify-content: space-between; overflow: hidden; }
+.welcome-row { position: relative; display: flex; min-height: 238px; align-items: center; justify-content: space-between; overflow: hidden; }
 .eyebrow, .section-kicker { display: flex; align-items: center; gap: 8px; color: #7e8d80; font-size: 9px; font-weight: 700; letter-spacing: 1.25px; }
 .eyebrow-line { width: 19px; height: 1px; background: #95b38e; }
 h1, h2, h3, p { margin-top: 0; }
@@ -93,21 +93,39 @@ h1 { margin: 13px 0 10px; color: #24352e; font: 700 clamp(31px, 4vw, 42px)/1.14 
 .period { color: #df9c6c; }
 .serif-accent { color: #32644e; font-family: Georgia, serif; font-weight: 400; font-style: italic; letter-spacing: -1.5px; }
 .welcome-copy { margin: 0; color: #79837d; font-size: 11px; line-height: 1.8; }
-.welcome-art { position: absolute; right: 7%; top: 6px; width: 235px; height: 180px; }
-.art-sun { position: absolute; width: 105px; height: 105px; top: 20px; right: 35px; border-radius: 50%; background: #f6dfbd; animation: sunBreathe 5s ease-in-out infinite; }
+.welcome-art { position: absolute; right: 6%; top: 1px; width: 280px; height: 235px; isolation: isolate; }
+.art-aura { position: absolute; z-index: 0; inset: 12px 18px; border-radius: 50%; }
+.art-sun { position: absolute; z-index: 2; width: 128px; height: 128px; top: 51px; right: 76px; border-radius: 50%; animation: heroSpherePulse 7s ease-in-out infinite, heroSphereFlow 16s ease-in-out infinite; }
 .art-circle { position: absolute; border: 1px solid rgba(99,137,104,.19); border-radius: 50%; }
-.art-circle-one { width: 170px; height: 170px; top: -12px; right: 3px; animation: haloBreathe 6s ease-in-out infinite; }
-.art-circle-two { width: 208px; height: 208px; top: -31px; right: -16px; animation: haloBreathe 6s ease-in-out -3s infinite; }
-.art-leaf { position: absolute; display: grid; place-items: center; color: #547f63; background: #cfe0c8; border-radius: 100% 10% 100% 20%; transform: rotate(-35deg); box-shadow: 0 8px 20px rgba(65,102,77,.12); }
-.leaf-one { width: 62px; height: 62px; top: 72px; right: 84px; animation: leafSway 4.6s ease-in-out infinite; }
-.leaf-two { width: 48px; height: 48px; top: 47px; right: 47px; color: #8c9f6b; background: #e0e6bf; transform: rotate(20deg); animation: leafSwayAlt 5.2s ease-in-out -1.8s infinite; }
-.art-sparkle { position: absolute; top: 24px; right: 36px; display: grid; place-items: center; color: #bf9062; animation: twinkle 2.8s ease-in-out infinite; }
-.art-caption { position: absolute; right: 14px; bottom: 6px; color: #84917c; font: italic 11px/1.2 Georgia, serif; text-align: center; transform: rotate(-8deg); }
-@keyframes twinkle { 0%, 100% { transform: scale(.85) rotate(-8deg); opacity: .7; } 50% { transform: scale(1.12) rotate(8deg); opacity: 1; } }
-@keyframes sunBreathe { 0%, 100% { transform: scale(.98); opacity: .88; } 50% { transform: scale(1.04); opacity: 1; } }
-@keyframes haloBreathe { 0%, 100% { transform: scale(.985); opacity: .55; } 50% { transform: scale(1.015); opacity: .95; } }
-@keyframes leafSway { 0%, 100% { transform: rotate(-35deg) translateY(0); } 50% { transform: rotate(-30deg) translateY(-4px); } }
-@keyframes leafSwayAlt { 0%, 100% { transform: rotate(20deg) translateY(0); } 50% { transform: rotate(25deg) translateY(-4px); } }
+.art-circle-one { z-index: 1; width: 214px; height: 214px; top: 8px; right: 33px; animation: heroRingOrbit 28s linear infinite, heroRingGlow 9s ease-in-out infinite; }
+.art-circle-two { z-index: 1; width: 260px; height: 260px; top: -15px; right: 10px; animation: heroRingOrbitReverse 42s linear infinite, heroRingGlow 11s ease-in-out -4s infinite; }
+.art-leaf { position: absolute; z-index: 3; display: grid; place-items: center; border-radius: 100% 10% 100% 20%; rotate: -35deg; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+.leaf-one { width: 76px; height: 76px; top: 92px; right: 112px; animation-name: heroLeafFloat; animation-duration: 8.2s; animation-delay: -1.6s; }
+.leaf-two { width: 60px; height: 60px; top: 69px; right: 100px; rotate: 20deg; animation-name: heroLeafDrift; animation-duration: 9.4s; animation-delay: -4s; }
+.art-sparkle { position: absolute; z-index: 5; top: 37px; right: 73px; display: grid; place-items: center; animation: heroSparkleTwinkle 3.2s ease-in-out infinite; }
+.art-caption { position: absolute; z-index: 5; right: 18px; bottom: 8px; font: italic 12px/1.2 Georgia, serif; text-align: center; rotate: -8deg; }
+.art-trail { position: absolute; z-index: 2; width: 72px; height: 2px; border-radius: 50%; opacity: 0; rotate: -36deg; animation: heroTrailShimmer 8s ease-in-out infinite; }
+.trail-one { top: 53px; left: 21px; animation-delay: -2.7s; }
+.trail-two { right: 3px; bottom: 56px; width: 54px; rotate: 24deg; animation-delay: -6s; }
+.art-particle { position: absolute; z-index: 4; width: 4px; height: 4px; border-radius: 50%; opacity: 0; animation: heroParticleDrift 7s ease-in-out infinite; }
+.particle-one { top: 24%; left: 13%; animation-delay: -1s; }
+.particle-two { top: 68%; left: 83%; width: 3px; height: 3px; animation-delay: -3.4s; }
+.particle-three { top: 16%; left: 62%; width: 3px; height: 3px; animation-delay: -5.2s; }
+.particle-four { top: 81%; left: 34%; animation-delay: -2.3s; }
+.art-sparkle-mini { position: absolute; z-index: 4; width: 5px; height: 5px; border-radius: 1px; rotate: 45deg; animation: heroSparkleTwinkle 4.2s ease-in-out infinite; }
+.sparkle-one { top: 28%; left: 27%; animation-delay: -2s; }
+.sparkle-two { right: 22%; bottom: 25%; width: 4px; height: 4px; animation-delay: -3.1s; }
+@keyframes heroSpherePulse { 0%, 100% { scale: 1; filter: brightness(.94); } 50% { scale: 1.045; filter: brightness(1.12); } }
+@keyframes heroSphereFlow { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 55%; } }
+@keyframes heroSphereShimmer { 0%, 20%, 100% { background-position: 170% 0; opacity: 0; } 35%, 55% { opacity: .75; } 70% { background-position: -50% 0; opacity: 0; } }
+@keyframes heroRingOrbit { from { rotate: 0deg; } to { rotate: 360deg; } }
+@keyframes heroRingOrbitReverse { from { rotate: 0deg; } to { rotate: -360deg; } }
+@keyframes heroRingGlow { 0%, 100% { opacity: .52; } 50% { opacity: .88; } }
+@keyframes heroLeafFloat { 0%, 100% { translate: 0 0; rotate: -35deg; scale: 1; } 28% { translate: 1px -5px; rotate: -31deg; scale: 1.025; } 62% { translate: -1px -9px; rotate: -27deg; scale: 1.045; } 82% { translate: 0 -4px; rotate: -32deg; scale: 1.02; } }
+@keyframes heroLeafDrift { 0%, 100% { translate: 0 0; rotate: 20deg; scale: 1; } 32% { translate: -1px -6px; rotate: 24deg; scale: 1.035; } 66% { translate: 1px -10px; rotate: 28deg; scale: 1.055; } 84% { translate: 0 -4px; rotate: 23deg; scale: 1.02; } }
+@keyframes heroSparkleTwinkle { 0%, 100% { opacity: .48; scale: .82; rotate: -8deg; } 48% { opacity: 1; scale: 1.16; rotate: 8deg; } }
+@keyframes heroParticleDrift { 0%, 100% { translate: 0 0; opacity: 0; scale: .55; } 22% { opacity: .85; } 55% { translate: 7px -12px; opacity: 1; scale: 1.15; } 82% { opacity: .4; } }
+@keyframes heroTrailShimmer { 0%, 18%, 100% { opacity: 0; scale: .55 1; } 38% { opacity: .7; } 62% { opacity: .24; scale: 1.2 1; } }
 
 .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); margin: 22px 0 38px; padding: 16px 10px; border: 1px solid #e8ebe6; border-radius: 11px; background: rgba(255,255,255,.55); }
 .stat-item { display: flex; align-items: center; gap: 10px; padding: 0 13px; }
@@ -445,7 +463,7 @@ h1 { margin: 13px 0 10px; color: #24352e; font: 700 clamp(31px, 4vw, 42px)/1.14 
 
 @media (min-width: 1500px) {
   .page-wrap { padding-top: 52px; }
-  .welcome-row { min-height: 205px; }
+  .welcome-row { min-height: 238px; }
   .stats-row { margin-bottom: 45px; }
 }
 @media (max-width: 1050px) {
@@ -468,8 +486,8 @@ h1 { margin: 13px 0 10px; color: #24352e; font: 700 clamp(31px, 4vw, 42px)/1.14 
   .topbar-actions { gap: 10px; }
   .secure-label { display: none; }
   .page-wrap { padding: 28px 20px 17px; }
-  .welcome-row { min-height: 174px; align-items: flex-start; padding-top: 8px; }
-  .welcome-art { right: -61px; top: 28px; transform: scale(.67); opacity: .65; }
+  .welcome-row { min-height: 196px; align-items: flex-start; padding-top: 8px; }
+  .welcome-art { right: -62px; top: 20px; transform: scale(.68); transform-origin: center right; opacity: .58; }
   .welcome-row > div:first-child { position: relative; z-index: 1; }
   h1 { font-size: 35px; }
   .welcome-copy { max-width: 290px; font-size: 10px; }
@@ -491,8 +509,8 @@ h1 { margin: 13px 0 10px; color: #24352e; font: 700 clamp(31px, 4vw, 42px)/1.14 
   .page-wrap { padding-right: 16px; padding-left: 16px; }
   .topbar { padding: 0 14px; }
   .breadcrumb span { padding: 0 5px; }
-  .welcome-row { min-height: 184px; }
-  .welcome-art { right: -102px; opacity: .38; }
+  .welcome-row { min-height: 190px; }
+  .welcome-art { right: -26px; top: 25px; transform: scale(.54); opacity: .34; }
   h1 { font-size: 32px; }
   .desktop-break { display: none; }
   .section-heading { align-items: center; }
@@ -633,4 +651,6 @@ h1 { margin: 13px 0 10px; color: #24352e; font: 700 clamp(31px, 4vw, 42px)/1.14 
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .scheme-card:hover { transform: none; }
   .scheme-card:hover .scheme-link svg, .scheme-link:hover svg { transform: none; }
+  .welcome-art * { animation: none !important; }
+  .welcome-art .art-caption { opacity: 1; }
 }
