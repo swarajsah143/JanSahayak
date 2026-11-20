@@ -33,6 +33,9 @@ const emailTransport = smtpHost &&
       port: smtpPort,
       secure: process.env.SMTP_SECURE === "true",
       auth: { user: smtpUser, pass: smtpPassword },
+      pool: true,
+      maxConnections: 3,
+      maxMessages: 100,
     })
   : null;
 

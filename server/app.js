@@ -230,13 +230,16 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
       }
 
       const { email, fullName, password } = normalizeRegistration(request.body);
-      if (await users.findOne({ email }, { projection: { _id: 1 } })) {
+      const [existingUser, pendingVerification] = await Promise.all([
+        users.findOne({ email }, { projection: { _id: 1 } }),
+        emailVerifications.findOne({ email }),
+      ]);
+      if (existingUser) {
         response.status(409).json({ error: "An account with that email already exists." });
         return;
       }
 
       const now = new Date();
-      const pendingVerification = await emailVerifications.findOne({ email });
       if (pendingVerification) {
         if (pendingVerification.expiresAt > now) {
           response.status(202).json({ verificationRequired: true, email });

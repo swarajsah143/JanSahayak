@@ -36,7 +36,7 @@ Account creation sends a six-digit verification code through SMTP. Fill in these
 - `SMTP_USER` and `SMTP_PASS`
 - `EMAIL_FROM` (the sender address permitted by your provider)
 
-Restart `npm run dev` after editing `.env`. Registration remains disabled until SMTP is configured. Codes expire after 10 minutes, can be resent after 60 seconds, and allow five verification attempts. The API stores only a keyed code hash in MongoDB while verification is pending; it does not store the plain code.
+The API reuses up to three SMTP connections to avoid a new connection and authentication handshake for every code. Restart `npm run dev` after editing `.env`. Registration remains disabled until SMTP is configured. Codes expire after 10 minutes, can be resent after 60 seconds, and allow five verification attempts. The API stores only a keyed code hash in MongoDB while verification is pending; it does not store the plain code. SMTP providers control final delivery time, so use a transactional email provider with a nearby region if messages still arrive slowly.
 
 ## Run locally
 
