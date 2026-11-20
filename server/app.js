@@ -31,10 +31,11 @@ const SETUP_MESSAGE = "Set MONGODB_URI and SESSION_SECRET in the server .env fil
 const EMAIL_SETUP_MESSAGE = "Email verification requires SMTP settings in the server .env file.";
 
 function cookieOptions() {
+  const isProduction = process.env.NODE_ENV === "production";
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
     path: "/api",
   };
 }
@@ -56,6 +57,7 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
   const emailVerifications = db?.collection("emailVerifications");
 
   app.disable("x-powered-by");
+  app.set("trust proxy", 1);
   app.use(helmet({
     strictTransportSecurity: process.env.NODE_ENV === "production" ? undefined : false,
   }));
@@ -63,16 +65,33 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
   app.use(cookieParser());
 
   app.use("/api", (request, response, next) => {
+    const requestOrigin = request.get("origin");
+    const localDevelopmentOrigin = process.env.NODE_ENV !== "production" &&
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin || "");
+    const isAllowedOrigin = Boolean(
+      requestOrigin && (origins.has(requestOrigin) || localDevelopmentOrigin)
+    );
+
+    if (isAllowedOrigin) {
+      response.set("Access-Control-Allow-Origin", requestOrigin);
+      response.set("Access-Control-Allow-Credentials", "true");
+      response.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
+      response.set("Vary", "Origin");
+    }
+
+    if (request.method === "OPTIONS") {
+      return isAllowedOrigin ? response.sendStatus(204) : response.sendStatus(403);
+    }
+
     if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
-      const requestOrigin = request.get("origin");
-      const localDevelopmentOrigin = process.env.NODE_ENV !== "production" &&
-        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin || "");
-      if (requestOrigin && !origins.has(requestOrigin) && !localDevelopmentOrigin) {
+      if (requestOrigin && !isAllowedOrigin) {
         return response.status(403).json({ error: "This request origin is not allowed." });
       }
     }
     next();
   });
+
 
   app.get("/api/health", (_request, response) => {
     response.json({ configured, emailConfigured });
