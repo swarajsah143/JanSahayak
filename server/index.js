@@ -1,6 +1,5 @@
 import "dotenv/config";
 import { MongoClient } from "mongodb";
-import nodemailer from "nodemailer";
 import { createApp } from "./app.js";
 
 const mongoUri = process.env.MONGODB_URI?.trim();
@@ -16,27 +15,33 @@ const appOrigins = (process.env.APP_ORIGINS || "http://localhost:5173,http://127
   .map((origin) => origin.trim())
   .filter(Boolean);
 const port = Number(process.env.PORT || 3001);
-const smtpHost = process.env.SMTP_HOST?.trim();
-const smtpPort = Number(process.env.SMTP_PORT || 587);
-const smtpUser = process.env.SMTP_USER?.trim();
-const smtpPassword = process.env.SMTP_PASS;
+const brevoApiKey = process.env.BREVO_API_KEY?.trim();
 const emailFrom = process.env.EMAIL_FROM?.trim();
-const emailTransport = smtpHost &&
-  Number.isInteger(smtpPort) &&
-  smtpPort > 0 &&
-  smtpPort <= 65535 &&
-  smtpUser &&
-  smtpPassword &&
-  emailFrom
-  ? nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: process.env.SMTP_SECURE === "true",
-      auth: { user: smtpUser, pass: smtpPassword },
-      pool: true,
-      maxConnections: 3,
-      maxMessages: 100,
-    })
+const emailFromName = process.env.EMAIL_FROM_NAME?.trim() || "Jan Sahayak";
+const emailTransport = brevoApiKey && emailFrom
+  ? {
+      async sendMail({ to, subject, text }) {
+        const apiResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+            "api-key": brevoApiKey,
+          },
+          body: JSON.stringify({
+            sender: { name: emailFromName, email: emailFrom },
+            to: [{ email: to }],
+            subject,
+            textContent: text,
+          }),
+        });
+        const result = await apiResponse.json().catch(() => ({}));
+        if (!apiResponse.ok) {
+          throw new Error(`Brevo API ${apiResponse.status}: ${result.message || "Email request rejected."}`);
+        }
+        return result;
+      },
+    }
   : null;
 
 let db = null;
@@ -68,7 +73,7 @@ if (looksLikeConfiguredUri && sessionSecret) {
 }
 
 if (!emailTransport) {
-  console.warn("Email OTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and EMAIL_FROM in .env.");
+  console.warn("Email OTP is not configured. Set BREVO_API_KEY and EMAIL_FROM in the server environment.");
 }
 
 const app = createApp({ db, sessionSecret, emailTransport, emailFrom, appOrigins });

@@ -1051,7 +1051,7 @@ function App() {
               )}
               {apiConfigured && authMode === "register" && !emailConfigured && !pendingVerificationEmail && (
                 <div className="auth-feedback is-error" role="status">
-                  <ShieldCheck size={16} /> {t("Email verification needs SMTP settings. Add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and EMAIL_FROM to .env, then restart the app.")}
+                  <ShieldCheck size={16} /> {t("Email verification needs Brevo settings. Add BREVO_API_KEY and EMAIL_FROM to the server environment, then restart the API.")}
                 </div>
               )}
               {authError && <p className="auth-feedback is-error" role="alert">{authError}</p>}

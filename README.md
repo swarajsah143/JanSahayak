@@ -30,13 +30,13 @@ The `.env.example` contains placeholders only. Authentication stays disabled unt
 
 ## Configure email OTP
 
-Account creation sends a six-digit verification code through SMTP. Fill in these fields in the same server-side `.env` file using the SMTP settings from your email provider:
+Account creation sends a six-digit verification code through Brevo's transactional email HTTP API. Create a Brevo account, generate an API key, and register and verify the sender address you want to use. Set these values in the server-side `.env` file and in the Render API service's environment:
 
-- `SMTP_HOST`, `SMTP_PORT`, and `SMTP_SECURE`
-- `SMTP_USER` and `SMTP_PASS`
-- `EMAIL_FROM` (the sender address permitted by your provider)
+- `BREVO_API_KEY` (keep it private and only set it on the API server)
+- `EMAIL_FROM` (a sender address registered and verified in Brevo)
+- `EMAIL_FROM_NAME` (optional; defaults to `Jan Sahayak`)
 
-Registration returns as soon as the OTP request is saved; email delivery continues in the API background, and the signup page checks delivery status so failures can be retried. The API reuses up to three SMTP connections to avoid a new connection and authentication handshake for every code. Keep the Express API on a persistent Node.js host; a static Vercel deployment only serves the frontend and does not run `server/index.js`. Set the Vercel `VITE_API_URL` to the deployed API origin, and deploy/restart the API after changing server code or environment variables. Codes expire after 10 minutes, can be resent after 60 seconds, and allow five verification attempts. The API stores only a keyed code hash in MongoDB while verification is pending; it does not store the plain code. SMTP providers control final delivery time, so use a transactional email provider with a nearby region if messages still arrive slowly.
+Registration returns as soon as the OTP request is saved; email delivery continues in the API background, and the signup page checks delivery status so failures can be retried. Brevo's API is called over HTTPS, so it works on Render Free where outbound SMTP ports are blocked. Brevo's Free plan currently includes 300 email sends per day. A static Vercel deployment only serves the frontend and does not run `server/index.js`. Set the Vercel `VITE_API_URL` to the deployed API origin, and deploy/restart the API after changing server code or environment variables. Codes expire after 10 minutes, can be resent after 60 seconds, and allow five verification attempts. The API stores only a keyed code hash in MongoDB while verification is pending; it does not store the plain code. Check Brevo's transactional email logs if the API accepts a message but it doesn't arrive.
 
 ## Run locally
 
@@ -56,7 +56,7 @@ npm run build
 
 ## Authentication and administrator setup
 
-- Registration sends an email OTP and creates the account only after successful verification. Sign-in uses the Node/Express API. Passwords are hashed with bcrypt; authentication uses a signed, HTTP-only cookie. The browser never receives the database URI, SMTP credentials, or password hash.
+- Registration sends an email OTP and creates the account only after successful verification. Sign-in uses the Node/Express API. Passwords are hashed with bcrypt; authentication uses a signed, HTTP-only cookie. The browser never receives the database URI, Brevo API key, or password hash.
 - New accounts always receive the `user` role. To make the first admin, register and sign in normally, then use Atlas **Data Explorer** to find that record in `jan_sahayak.users` and change only its `role` field to `admin`. The API reads the role from MongoDB on protected requests; public registration cannot assign it.
 - Admins can publish a display name, title, department, and optional public contact under **Admin details**. Only those fields appear in the public directory.
 - Account email and display name are stored in MongoDB. Welfare profile details, including income, disability, household information, and location, remain in the current page session.

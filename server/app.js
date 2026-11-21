@@ -29,7 +29,7 @@ const TOKEN_ISSUER = "jan-sahayak";
 const TOKEN_LIFETIME_SECONDS = 7 * 24 * 60 * 60;
 const EMAIL_DELIVERY_STALE_MS = 60 * 1000;
 const SETUP_MESSAGE = "Set MONGODB_URI and SESSION_SECRET in the server .env file, then restart the API.";
-const EMAIL_SETUP_MESSAGE = "Email verification requires SMTP settings in the server .env file.";
+const EMAIL_SETUP_MESSAGE = "Email verification requires a transactional email API key in the server environment.";
 
 function cookieOptions() {
   const isProduction = process.env.NODE_ENV === "production";
@@ -140,7 +140,7 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
 
   function sendEmailSetupRequired(response) {
     response.status(503).json({
-      error: `${EMAIL_SETUP_MESSAGE} Configure SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and EMAIL_FROM.`,
+      error: `${EMAIL_SETUP_MESSAGE} Configure BREVO_API_KEY and EMAIL_FROM.`,
       code: "EMAIL_NOT_CONFIGURED",
     });
   }

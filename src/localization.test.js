@@ -113,7 +113,7 @@ test("MongoDB authentication and public admin-directory labels are localized", (
     "Password",
     "Working…",
     "Authentication is not configured. Add MongoDB Atlas settings to the server .env file, then restart the app.",
-    "Email verification needs SMTP settings. Add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and EMAIL_FROM to .env, then restart the app.",
+    "Email verification needs Brevo settings. Add BREVO_API_KEY and EMAIL_FROM to the server environment, then restart the API.",
     "Create a secure account with your email and password. Welfare details remain in this page session.",
     "Passwords are securely hashed by the server. Welfare profile details are not uploaded.",
     "Verify your email",
