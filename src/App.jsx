@@ -12,10 +12,6 @@ import { localizeScheme, translate } from "./localization.js";
 import { apiRequest } from "./api.js";
 import HeroIllustration from "./HeroIllustration.jsx";
 import {
-  searchNearbyServiceCentres,
-  ServiceCentreSearchError,
-} from "./service-centres.js";
-import {
   acknowledgeSchemeCatalogChanges,
   getUnreadNotifications,
   getSmartNotifications,
@@ -57,7 +53,14 @@ import {
   X,
 } from "lucide-react";
 
-const initialProfile = { state: "", age: "", householdIncome: "", occupation: "" };
+const initialProfile = {
+  state: "",
+  age: "",
+  householdIncome: "",
+  occupation: "",
+  housingStatus: "",
+  landholdingStatus: "",
+};
 const initialPersonalProfile = {
   fullName: "",
   dateOfBirth: "",
@@ -68,15 +71,18 @@ const initialPersonalProfile = {
   occupation: "",
   socialCategory: "",
   familySize: "",
+  housingStatus: "",
+  landholdingStatus: "",
   familyDetails: "",
   disabilityStatus: "",
   disabilityDetails: "",
 };
 
 function getServiceCentreDirectionsUrl(centre) {
-  const directions = new URL("https://www.openstreetmap.org/directions");
-  directions.searchParams.set("engine", "fossgis_osrm_car");
-  directions.searchParams.set("route", `;${centre.latitude},${centre.longitude}`);
+  const directions = new URL("https://www.google.com/maps/dir/");
+  directions.searchParams.set("api", "1");
+  directions.searchParams.set("destination", `${centre.latitude},${centre.longitude}`);
+  directions.searchParams.set("travelmode", "driving");
   return directions.toString();
 }
 
@@ -107,6 +113,51 @@ function getServiceCentreEmailUrl(email) {
 
 function App() {
   const shouldReduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (shouldReduceMotion || typeof window === "undefined" ||
+      !window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      return undefined;
+    }
+
+    const particles = new Set();
+    let lastSpawnAt = 0;
+    let hue = 175;
+    const onPointerMove = (event) => {
+      if (event.pointerType && event.pointerType !== "mouse") return;
+      const now = performance.now();
+      if (now - lastSpawnAt < 28) return;
+      lastSpawnAt = now;
+
+      const particle = document.createElement("span");
+      particle.className = "cursor-rgb-trail";
+      particle.style.left = `${event.clientX}px`;
+      particle.style.top = `${event.clientY}px`;
+      particle.style.setProperty("--trail-hue", String(hue));
+      hue = (hue + 43) % 360;
+      particles.add(particle);
+      document.body.appendChild(particle);
+
+      if (particles.size > 24) {
+        const oldestParticle = particles.values().next().value;
+        oldestParticle?.remove();
+        particles.delete(oldestParticle);
+      }
+
+      particle.addEventListener("animationend", () => {
+        particle.remove();
+        particles.delete(particle);
+      }, { once: true });
+    };
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      particles.forEach((particle) => particle.remove());
+      particles.clear();
+    };
+  }, [shouldReduceMotion]);
+
   const [profile, setProfile] = useState(initialProfile);
   const [personalProfile, setPersonalProfile] = useState(initialPersonalProfile);
   const [category, setCategory] = useState("All schemes");
@@ -323,6 +374,8 @@ function App() {
     age: profile.age,
     householdIncome: profile.householdIncome || personalProfile.annualIncome,
     occupation: profile.occupation || personalProfile.occupation,
+    housingStatus: profile.housingStatus || personalProfile.housingStatus,
+    landholdingStatus: profile.landholdingStatus || personalProfile.landholdingStatus,
   };
   const screeningResults = useMemo(
     () =>
@@ -333,7 +386,8 @@ function App() {
         ]),
       ),
     [schemeCatalog, checkerProfile.age, checkerProfile.disabilityStatus, checkerProfile.familySize,
-      checkerProfile.householdIncome, checkerProfile.occupation, checkerProfile.socialCategory],
+      checkerProfile.householdIncome, checkerProfile.housingStatus, checkerProfile.landholdingStatus,
+      checkerProfile.occupation, checkerProfile.socialCategory],
   );
   const verifiedEligibleCount = Object.values(screeningResults).filter(
     (result) => result.status === "eligible",
@@ -354,7 +408,6 @@ function App() {
   );
   const relevantNotificationSchemeIds = useMemo(() => [
     ...new Set([
-      ...saved,
       ...startedChecklistIds,
       ...(hasChecked
         ? schemeCatalog
@@ -362,7 +415,7 @@ function App() {
             .map((scheme) => scheme.id)
         : []),
     ]),
-  ], [hasChecked, saved, schemeCatalog, screeningResults, startedChecklistIds]);
+  ], [hasChecked, schemeCatalog, screeningResults, startedChecklistIds]);
   const smartNotifications = useMemo(
     () => getSmartNotifications({
       schemes: schemeCatalog,
@@ -406,7 +459,9 @@ function App() {
     const query = search.trim().toLowerCase();
     const matches = schemeCatalog.filter((scheme) => {
       const localizedScheme = localizeScheme(scheme, language);
-      const matchesCategory = category === "All schemes" || scheme.category === category;
+      const matchesCategory = screen === "favorites"
+        ? saved.includes(scheme.id)
+        : category === "All schemes" || scheme.category === category;
       const matchesSearch =
         !query ||
         `${scheme.name} ${scheme.category} ${scheme.department} ${scheme.description} ${scheme.benefits} ${localizedScheme.name} ${localizedScheme.category} ${localizedScheme.department} ${localizedScheme.description} ${localizedScheme.benefits}`.toLowerCase().includes(query);
@@ -417,7 +472,7 @@ function App() {
     return matches
       .map((scheme) => ({ ...scheme, eligibility: screeningResults[scheme.id] }))
       .sort((first, second) => second.eligibility.relevanceScore - first.eligibility.relevanceScore);
-  }, [category, hasChecked, language, schemeCatalog, screeningResults, search]);
+  }, [category, hasChecked, language, saved, screen, schemeCatalog, screeningResults, search]);
 
   const updateProfile = (event) => {
     setProfile({ ...profile, [event.target.name]: event.target.value });
@@ -694,20 +749,24 @@ function App() {
     setServiceCentres([]);
     setServiceCentreLocation("");
     try {
-      const result = await searchNearbyServiceCentres(area);
+      const result = await apiRequest("/nearby-centres", {
+        method: "POST",
+        body: JSON.stringify({ area }),
+      });
       setServiceCentres(result.centres);
       setServiceCentreLocation(result.locationName);
       setServiceCentreStatus("success");
     } catch (error) {
-      const errorKey = error instanceof ServiceCentreSearchError
-        ? {
+      const errorCode = error?.code;
+      const errorKey = {
             "empty-query": "Enter a city, district, or PIN code to search.",
             "geocoding-error": "Could not look up that area right now. Check your connection or try again later.",
             "location-not-found": "Could not find that area in India. Try a nearby city, district, or PIN code.",
             "directory-error": "Could not retrieve nearby map listings right now. Try again later or use the official CSC locator.",
             "network-error": "Network access is needed to search nearby centres.",
-          }[error.code] ?? "Nearby centre search failed. Try again later."
-        : "Nearby centre search failed. Try again later.";
+          }[errorCode] ?? (error instanceof Error
+            ? error.message
+            : "Nearby centre search failed. Try again later.");
       setServiceCentreError(errorKey);
       setServiceCentreStatus("error");
     }
@@ -851,6 +910,8 @@ function App() {
       age,
       householdIncome: personalProfile.annualIncome,
       occupation: personalProfile.occupation,
+      housingStatus: personalProfile.housingStatus,
+      landholdingStatus: personalProfile.landholdingStatus,
     });
     setAccount((current) => current && ({
       ...current,
@@ -924,7 +985,7 @@ function App() {
     );
   }
 
-  if (screen !== "dashboard") {
+  if (screen !== "dashboard" && screen !== "favorites") {
     return (
       <div className="account-page" lang={language}>
         <div className="account-orb account-orb-one" />
@@ -1134,6 +1195,24 @@ function App() {
                     </select>
                   </label>
                   <label className="field">
+                    <span>{t("Household housing status")} <small>{t("(optional)")}</small></span>
+                    <select name="housingStatus" value={personalProfile.housingStatus} onChange={updatePersonalProfile}>
+                      <option value="">{t("Prefer not to say")}</option>
+                      <option value="Owns a pucca house">{t("Owns a pucca (permanent) house")}</option>
+                      <option value="Does not own a pucca house">{t("Does not own a pucca house")}</option>
+                      <option value="Not sure">{t("Not sure")}</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>{t("Agricultural landholding")} <small>{t("(optional)")}</small></span>
+                    <select name="landholdingStatus" value={personalProfile.landholdingStatus} onChange={updatePersonalProfile}>
+                      <option value="">{t("Prefer not to say")}</option>
+                      <option value="Owns or cultivates agricultural land">{t("Household owns or cultivates agricultural land")}</option>
+                      <option value="No agricultural land">{t("Household has no agricultural land")}</option>
+                      <option value="Not sure">{t("Not sure")}</option>
+                    </select>
+                  </label>
+                  <label className="field">
                     <span>{t("Disability status")} <small>{t("(optional)")}</small></span>
                     <select name="disabilityStatus" value={personalProfile.disabilityStatus} onChange={updatePersonalProfile}>
                       <option value="">{t("Prefer not to say")}</option><option value="No">{t("No")}</option><option value="Yes">{t("Yes")}</option>
@@ -1176,13 +1255,22 @@ function App() {
 
         <div className="sidebar-label">{t("YOUR SPACE")}</div>
         <nav className="side-nav" aria-label={t("Main navigation")}>
-          <a className="nav-item active" href="#home" onClick={() => setMobileMenuOpen(false)}>
+          <a className={`nav-item ${screen === "dashboard" ? "active" : ""}`} href="#home" onClick={() => { setScreen("dashboard"); setMobileMenuOpen(false); }}>
             <Home size={18} /> <span>{t("Overview")}</span>
           </a>
-          <a className="nav-item" href="#schemes" onClick={() => setMobileMenuOpen(false)}>
+          <a className="nav-item" href="#schemes" onClick={() => { setScreen("dashboard"); setMobileMenuOpen(false); }}>
             <Search size={18} /> <span>{t("Find schemes")}</span>
             <span className="nav-count">{String(schemeCatalog.length).padStart(2, "0")}</span>
           </a>
+          <button
+            className={`nav-item nav-button ${screen === "favorites" ? "active" : ""}`}
+            type="button"
+            onClick={() => { setScreen("favorites"); setSearch(""); setMobileMenuOpen(false); }}
+          >
+            <Heart size={18} fill={saved.length ? "currentColor" : "none"} />
+            <span>{t("Favorites")}</span>
+            <span className="nav-count">{String(saved.length).padStart(2, "0")}</span>
+          </button>
           <a className="nav-item" href="#service-centres" onClick={() => setMobileMenuOpen(false)}>
             <MapPin size={18} /> <span>{t("Nearby centres")}</span>
           </a>
@@ -1231,7 +1319,7 @@ function App() {
           >
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <div className="breadcrumb">{t("Your space")} <span>/</span> <b>{t("Overview")}</b></div>
+          <div className="breadcrumb">{t("Your space")} <span>/</span> <b>{t(screen === "favorites" ? "Favorites" : "Overview")}</b></div>
           <div className="topbar-actions">
             <span className="secure-label"><span className="secure-dot" /> {authStatusLabel}</span>
             <div className="notification-menu">
@@ -1353,6 +1441,7 @@ function App() {
         </header>
 
         <div className="page-wrap">
+          {screen !== "favorites" && <>
           <motion.section
             className="welcome-row"
             initial={shouldReduceMotion ? false : { opacity: 0, y: 14 }}
@@ -1454,6 +1543,26 @@ function App() {
                   </select>
                   <ChevronDown className="field-chevron" size={15} />
                 </label>
+                <label className="field">
+                  <span>{t("Household housing status")}</span>
+                  <select name="housingStatus" value={profile.housingStatus} onChange={updateProfile}>
+                    <option value="">{t("Prefer not to say")}</option>
+                    <option value="Owns a pucca house">{t("Owns a pucca (permanent) house")}</option>
+                    <option value="Does not own a pucca house">{t("Does not own a pucca house")}</option>
+                    <option value="Not sure">{t("Not sure")}</option>
+                  </select>
+                  <ChevronDown className="field-chevron" size={15} />
+                </label>
+                <label className="field">
+                  <span>{t("Agricultural landholding")}</span>
+                  <select name="landholdingStatus" value={profile.landholdingStatus} onChange={updateProfile}>
+                    <option value="">{t("Prefer not to say")}</option>
+                    <option value="Owns or cultivates agricultural land">{t("Household owns or cultivates agricultural land")}</option>
+                    <option value="No agricultural land">{t("Household has no agricultural land")}</option>
+                    <option value="Not sure">{t("Not sure")}</option>
+                  </select>
+                  <ChevronDown className="field-chevron" size={15} />
+                </label>
               </div>
               <div className="form-footer">
                 <span className="privacy-note"><ShieldCheck size={15} /> {t("Your answers stay private and are not stored.")}</span>
@@ -1463,16 +1572,23 @@ function App() {
               </div>
             </form>
           </motion.section>
+          </>}
 
           <section className="schemes-section" id="schemes">
             <div className="schemes-heading">
               <div>
-                <div className="section-kicker">{t("A GOOD PLACE TO BEGIN")}</div>
-                <h2>{hasChecked ? t("Schemes to explore") : t("Popular schemes to explore")} <span className="heading-count">0{visibleSchemes.length}</span></h2>
+                <div className="section-kicker">{t(screen === "favorites" ? "YOUR SAVED SCHEMES" : "A GOOD PLACE TO BEGIN")}</div>
+                <h2>{screen === "favorites"
+                  ? t("Favorite schemes")
+                  : hasChecked ? t("Schemes to explore") : t("Popular schemes to explore")} <span className="heading-count">0{visibleSchemes.length}</span></h2>
               </div>
-              <a className="text-link" href="#scheme-list">{t("Browse all schemes")} <ArrowRight size={15} /></a>
+              {screen === "favorites" ? (
+                <a className="text-link" href="#home" onClick={() => setScreen("dashboard")}>{t("Back to overview")} <ArrowRight size={15} /></a>
+              ) : (
+                <a className="text-link" href="#scheme-list">{t("Browse all schemes")} <ArrowRight size={15} /></a>
+              )}
             </div>
-            {hasChecked && (
+            {screen !== "favorites" && hasChecked && (
               <motion.div
                 className="screening-results"
                 initial={{ opacity: 0, height: 0 }}
@@ -1565,7 +1681,10 @@ function App() {
                           aria-label={isSaved
                             ? `${t("Remove from saved schemes")} ${displayScheme.name}`
                             : `${t("Save scheme")} ${displayScheme.name}`}
-                          onClick={() => toggleSaved(scheme.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleSaved(scheme.id);
+                          }}
                         >
                           <Heart size={16} fill={isSaved ? "currentColor" : "none"} />
                         </button>
@@ -1623,9 +1742,11 @@ function App() {
               </AnimatePresence>
               {visibleSchemes.length === 0 && (
                 <div className="empty-state">
-                  <Search size={22} />
-                  <strong>{t("No schemes found")}</strong>
-                  <span>{t("Try another search or choose a different category.")}</span>
+                  {screen === "favorites" && saved.length === 0 ? <Heart size={22} /> : <Search size={22} />}
+                  <strong>{t(screen === "favorites" && saved.length === 0 ? "No favorite schemes yet" : "No schemes found")}</strong>
+                  <span>{t(screen === "favorites" && saved.length === 0
+                    ? "Tap a heart on any scheme card to add it here."
+                    : "Try another search or choose a different category.")}</span>
                 </div>
               )}
             </div>
@@ -1636,7 +1757,7 @@ function App() {
             </div>
           </section>
 
-          <section className="service-centres-section" id="service-centres" aria-labelledby="service-centres-title">
+          {screen !== "favorites" && <section className="service-centres-section" id="service-centres" aria-labelledby="service-centres-title">
             <div className="service-centres-heading">
               <div>
                 <div className="section-kicker">{t("LOCAL SUPPORT, CLOSER BY")}</div>
@@ -1782,7 +1903,7 @@ function App() {
                 </p>
               </div>
             )}
-          </section>
+          </section>}
 
           <footer className="page-footer">
             <span>{t("Built to make public support easier to reach.")}</span>

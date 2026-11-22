@@ -215,7 +215,7 @@ h1 { margin: 13px 0 10px; color: #24352e; font: 700 clamp(31px, 4vw, 42px)/1.14 
 .scheme-card:hover, .scheme-card:focus-within { color: #fff; border-color: #63b58f; background: linear-gradient(155deg, #07896c 0%, #06755c 100%); box-shadow: 0 14px 30px rgba(4,70,53,.22); }
 .scheme-card-hit-area { position: absolute; z-index: 1; inset: 0; padding: 0; border: 0; border-radius: inherit; color: inherit; background: transparent; appearance: none; cursor: pointer; }
 .scheme-card-hit-area:focus-visible { outline: 2px solid #6f9a71; outline-offset: 3px; }
-.scheme-card-top { position: relative; display: flex; min-height: 63px; align-items: center; justify-content: center; }
+.scheme-card-top { position: relative; z-index: 2; display: flex; min-height: 63px; align-items: center; justify-content: center; }
 .scheme-icon { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 16px; }
 .scheme-icon.mint { color: #43735a; background: #e6f0e6; }
 .scheme-icon.peach { color: #a56d50; background: #f6e8df; }
@@ -232,6 +232,7 @@ h1 { margin: 13px 0 10px; color: #24352e; font: 700 clamp(31px, 4vw, 42px)/1.14 
 .save-button { position: absolute; z-index: 2; top: -17px; right: -14px; display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 0 10px 0 10px; color: #fff; background: #e1b537; transition: background-color .2s ease, transform .2s ease; }
 .save-button:hover { transform: scale(1.06); background: #c99d1f; }
 .save-button.is-saved { color: #fff; background: #c87957; }
+.save-button.is-saved svg { fill: currentColor; }
 .scheme-card h3 { display: -webkit-box; min-height: 38px; margin: 9px 0 5px; overflow: hidden; color: #273a31; font: 700 14px/1.35 "Manrope", sans-serif; letter-spacing: -.25px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .scheme-department { display: -webkit-box; margin: 0 0 3px; overflow: hidden; color: #8a948d; font-size: 7px; line-height: 1.4; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
 .scheme-description { display: -webkit-box; min-height: 31px; margin: 0; overflow: hidden; color: #818b84; font-size: 10px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }

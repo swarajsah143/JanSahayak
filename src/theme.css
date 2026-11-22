@@ -22,6 +22,25 @@
 
 html, body { background: var(--night); color: var(--text); }
 body { background-image: radial-gradient(ellipse at 70% 0%, rgba(86, 47, 166, .16), transparent 40%), radial-gradient(ellipse at 5% 45%, rgba(17, 114, 157, .08), transparent 35%); }
+.cursor-rgb-trail {
+  position: fixed;
+  z-index: 10000;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  pointer-events: none;
+  border-radius: 50%;
+  opacity: 0;
+  background: radial-gradient(circle, hsla(var(--trail-hue), 100%, 76%, .9) 0%, hsla(var(--trail-hue), 100%, 64%, .42) 34%, transparent 74%);
+  filter: blur(1.5px);
+  mix-blend-mode: screen;
+  animation: cursorRgbTrail .72s cubic-bezier(.18, .7, .22, 1) forwards;
+}
+@keyframes cursorRgbTrail {
+  0% { opacity: .88; transform: scale(.35); }
+  42% { opacity: .55; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.85); }
+}
 button, input, select, textarea { color-scheme: dark; }
 ::selection { color: #fff; background: rgba(143, 75, 235, .62); }
 
@@ -205,10 +224,25 @@ h1 { color: #f0f3ff; }
 .service-centre-results { border-color: var(--line); }
 .service-centres-results-heading h3 { color: #e0e9f9; }
 .service-centres-results-heading > span { background: rgba(168, 85, 247, .14); }
-.service-centre-card { border-color: var(--line); background: linear-gradient(145deg, #121e36, #0c162a); transition: transform .28s, box-shadow .28s, border-color .28s; }
-.service-centre-card:hover { transform: perspective(700px) rotateX(1deg) translateY(-3px); border-color: rgba(34, 211, 238, .42); box-shadow: 0 12px 30px rgba(29, 98, 177, .17), 0 0 18px rgba(153, 81, 244, .12); }
+.service-centre-card {
+  --centre-accent-rgb: 168, 85, 247;
+  border-color: rgba(var(--centre-accent-rgb), .24);
+  background: radial-gradient(ellipse at 50% 0%, rgba(var(--centre-accent-rgb), .1), transparent 58%), linear-gradient(150deg, rgba(19, 30, 55, .98), rgba(11, 19, 37, .98));
+  box-shadow: 0 12px 28px rgba(1, 5, 17, .25), 0 0 16px rgba(var(--centre-accent-rgb), .08), inset 0 1px rgba(255,255,255,.025);
+  transition: transform .28s, box-shadow .28s, border-color .28s, background .28s;
+}
+.service-centre-card:nth-child(4n + 1) { --centre-accent-rgb: 45, 212, 191; }
+.service-centre-card:nth-child(4n + 2) { --centre-accent-rgb: var(--magenta-rgb); }
+.service-centre-card:nth-child(4n + 3) { --centre-accent-rgb: 168, 85, 247; }
+.service-centre-card:nth-child(4n + 4) { --centre-accent-rgb: 56, 189, 248; }
+.service-centre-card:hover {
+  transform: perspective(700px) rotateX(1deg) translateY(-3px);
+  border-color: rgba(var(--centre-accent-rgb), .72);
+  background: radial-gradient(ellipse at 50% 0%, rgba(var(--centre-accent-rgb), .18), transparent 58%), linear-gradient(145deg, #17264a, #171832 58%, #102336);
+  box-shadow: 0 18px 38px rgba(35, 95, 188, .18), 0 0 26px rgba(var(--centre-accent-rgb), .2), inset 0 1px rgba(189, 225, 255, .13);
+}
 .service-centre-card-meta, .service-centre-address, .service-centre-contacts p { color: #a7b4ca; }
-.service-centre-type, .service-centre-type.government { color: #d7c5ff; background: rgba(147, 94, 225, .18); }
+.service-centre-type, .service-centre-type.government { color: rgb(var(--centre-accent-rgb)); background: rgba(var(--centre-accent-rgb), .15); }
 .service-centre-card h4 { color: #e5ecfb; }
 .service-centre-address svg, .service-centre-contacts svg { color: #72dfee; }
 .service-centre-contacts { border-color: var(--line); }

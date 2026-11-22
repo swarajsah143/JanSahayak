@@ -6,6 +6,10 @@ import helmet from "helmet";
 import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 import {
+  searchNearbyServiceCentres,
+  ServiceCentreSearchError,
+} from "../src/service-centres.js";
+import {
   createEmailVerificationCode,
   EMAIL_CODE_LIFETIME_MS,
   EMAIL_CODE_MAX_ATTEMPTS,
@@ -96,6 +100,48 @@ export function createApp({ db, sessionSecret, emailTransport, emailFrom, appOri
 
   app.get("/api/health", (_request, response) => {
     response.json({ configured, emailConfigured });
+  });
+
+  const serviceCentreLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Please wait before searching for nearby centres again." },
+  });
+
+  app.post("/api/nearby-centres", serviceCentreLimiter, async (request, response) => {
+    const area = typeof request.body?.area === "string" ? request.body.area.trim() : "";
+    if (!area || area.length > 100) {
+      response.status(400).json({
+        error: "Enter a city, district, or PIN code to search.",
+        code: "empty-query",
+      });
+      return;
+    }
+
+    try {
+      const result = await searchNearbyServiceCentres(area, (url, options = {}) => fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          "User-Agent": "JanSahayak/1.0 (nearby public service centre lookup)",
+        },
+      }));
+      response.json(result);
+    } catch (error) {
+      const code = error instanceof ServiceCentreSearchError ? error.code : "network-error";
+      response.status(502).json({
+        error: code === "geocoding-error"
+          ? "Could not look up that area right now. Check your connection or try again later."
+          : code === "location-not-found"
+            ? "Could not find that area in India. Try a nearby city, district, or PIN code."
+            : code === "directory-error"
+              ? "Could not retrieve nearby map listings right now. Try again later or use the official CSC locator."
+              : "Nearby centre search failed. Try again later.",
+        code,
+      });
+    }
   });
 
   app.use("/api", (_request, response, next) => {

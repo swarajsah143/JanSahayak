@@ -77,13 +77,29 @@ export function evaluateSchemeEligibility(schemeId, profile = {}) {
           "Household size is included as context only and does not determine PMAY eligibility.",
         );
       }
+      if (profile.housingStatus === "Does not own a pucca house") {
+        relevanceScore += 2;
+        relevanceReasons.push(
+          "Your reported housing status may help prioritize PMAY exploration; the applicable component and other official conditions still need checking.",
+        );
+      }
       break;
     case "farmers":
       if (profile.occupation === "Farmer") {
         relevanceScore += 4;
         relevanceReasons.push(
-          "Farmer occupation is a broad PM-KISAN exploration signal; it does not confirm landholding or scheme eligibility.",
+          "Farmer occupation is a broad PM-KISAN exploration signal; it does not confirm scheme eligibility.",
         );
+        if (profile.landholdingStatus === "Owns or cultivates agricultural land") {
+          relevanceScore += 2;
+          relevanceReasons.push(
+            "Reported agricultural landholding may help prioritize PM-KISAN information; official land records and current rules determine eligibility.",
+          );
+        } else if (profile.landholdingStatus === "No agricultural land") {
+          relevanceReasons.push(
+            "You reported no agricultural land. Check current PM-KISAN landholding rules; this profile hint is not an eligibility decision.",
+          );
+        }
       }
       break;
     case "education":

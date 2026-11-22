@@ -13,7 +13,9 @@ export async function apiRequest(path, options = {}) {
   const result = response.status === 204 ? {} : await response.json();
 
   if (!response.ok) {
-    throw new Error(result.error || `Request failed with status ${response.status}.`);
+    const error = new Error(result.error || `Request failed with status ${response.status}.`);
+    error.code = result.code;
+    throw error;
   }
 
   return result;

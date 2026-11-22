@@ -1,7 +1,17 @@
 const PHOTON_ENDPOINT = "https://photon.komoot.io/api/";
-const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
+const PHOTON_REVERSE_ENDPOINT = "https://photon.komoot.io/reverse";
 const SEARCH_RADIUS_METERS = 8000;
 const MAX_RESULTS = 60;
+const PHOTON_SERVICE_TAGS = [
+  "office:government",
+  "government:administrative",
+  "government:register_office",
+  "government:tax",
+  "government:public_service",
+  "government:social_services",
+  "amenity:townhall",
+  "amenity:courthouse",
+];
 
 const cscNamePattern =
   /\b(csc|common service cent(re|er)|e.?seva|emitra|jan seva|mee seva|seva kendra|suvidha kendra)\b/i;
@@ -14,9 +24,10 @@ export class ServiceCentreSearchError extends Error {
   }
 }
 
-function getCoordinates(element) {
-  const latitude = Number(element.lat ?? element.center?.lat);
-  const longitude = Number(element.lon ?? element.center?.lon);
+function getCoordinates(feature) {
+  const coordinates = feature.geometry?.coordinates;
+  const longitude = Number(coordinates?.[0]);
+  const latitude = Number(coordinates?.[1]);
   if (
     !Number.isFinite(latitude) ||
     !Number.isFinite(longitude) ||
@@ -49,40 +60,43 @@ function getStringTag(tags, keys) {
   return "";
 }
 
-function getAddress(tags) {
-  const fullAddress = getStringTag(tags, ["addr:full"]);
+function getAddress(properties) {
+  const fullAddress = getStringTag(properties, ["addr:full"]);
   if (fullAddress) return fullAddress;
   return [
-    tags["addr:housenumber"],
-    tags["addr:street"],
-    tags["addr:suburb"],
-    tags["addr:city"] ?? tags["addr:town"] ?? tags["addr:village"],
-    tags["addr:district"],
-    tags["addr:postcode"],
+    properties.housenumber,
+    properties.street,
+    properties.district,
+    properties.city ?? properties.county,
+    properties.state,
+    properties.postcode,
   ]
     .filter((part) => typeof part === "string" && part.trim())
     .map((part) => part.trim())
     .join(", ");
 }
 
-function toServiceCentre(element, origin) {
-  if (!element || typeof element !== "object") return null;
-  const tags = element.tags && typeof element.tags === "object" ? element.tags : {};
-  const name = getStringTag(tags, ["name", "name:en", "official_name"]);
-  const coordinates = getCoordinates(element);
+function toServiceCentre(feature, origin) {
+  if (!feature || typeof feature !== "object") return null;
+  const properties = feature.properties && typeof feature.properties === "object"
+    ? feature.properties
+    : {};
+  const extra = properties.extra && typeof properties.extra === "object" ? properties.extra : {};
+  const name = getStringTag(properties, ["name", "name:en", "official_name"]);
+  const coordinates = getCoordinates(feature);
   if (!name || !coordinates) return null;
 
   const distanceMeters = distanceInMeters(origin, coordinates);
   if (distanceMeters > SEARCH_RADIUS_METERS) return null;
 
   return {
-    id: `${element.type}/${element.id}`,
+    id: `${properties.osm_type ?? "photon"}/${properties.osm_id ?? `${coordinates.latitude},${coordinates.longitude}`}`,
     name,
     type: cscNamePattern.test(name) ? "csc" : "government",
-    address: getAddress(tags),
-    phone: getStringTag(tags, ["contact:phone", "phone", "contact:mobile", "mobile"]),
-    email: getStringTag(tags, ["contact:email", "email"]),
-    website: getStringTag(tags, ["contact:website", "website"]),
+    address: getAddress(properties),
+    phone: getStringTag(extra, ["contact:phone", "phone", "contact:mobile", "mobile"]),
+    email: getStringTag(extra, ["contact:email", "email"]),
+    website: getStringTag(extra, ["contact:website", "website"]),
     latitude: coordinates.latitude,
     longitude: coordinates.longitude,
     distanceMeters,
@@ -95,17 +109,6 @@ function formatLocationName(properties, fallback) {
     properties.state,
   ].filter(Boolean);
   return [...new Set(parts)].join(", ");
-}
-
-function buildOverpassQuery({ latitude, longitude }) {
-  return `[out:json][timeout:25];
-(
-  nwr(around:${SEARCH_RADIUS_METERS},${latitude},${longitude})["office"="government"];
-  nwr(around:${SEARCH_RADIUS_METERS},${latitude},${longitude})["government"~"administrative|register_office|tax|public_service|social_services",i];
-  nwr(around:${SEARCH_RADIUS_METERS},${latitude},${longitude})["amenity"~"townhall|courthouse",i];
-  nwr(around:${SEARCH_RADIUS_METERS},${latitude},${longitude})["name"~"Common Service Centre|Common Service Center|CSC|e.?Seva|eMitra|Jan Seva|Mee Seva|Seva Kendra|Suvidha Kendra",i];
-);
-out center;`;
 }
 
 async function fetchJson(fetchImpl, url, options, errorCode) {
@@ -171,21 +174,22 @@ export async function searchNearbyServiceCentres(query, fetchImpl = globalThis.f
     throw new ServiceCentreSearchError("location-not-found");
   }
 
-  const overpassUrl = new URL(OVERPASS_ENDPOINT);
-  overpassUrl.searchParams.set("data", buildOverpassQuery(origin));
-  const directory = await fetchJson(
-    fetchImpl,
-    overpassUrl,
-    undefined,
-    "directory-error",
-  );
-  if (!Array.isArray(directory.elements)) {
+  const nearbyUrl = new URL(PHOTON_REVERSE_ENDPOINT);
+  nearbyUrl.searchParams.set("lon", String(origin.longitude));
+  nearbyUrl.searchParams.set("lat", String(origin.latitude));
+  nearbyUrl.searchParams.set("radius", String(SEARCH_RADIUS_METERS / 1000));
+  nearbyUrl.searchParams.set("limit", String(MAX_RESULTS));
+  nearbyUrl.searchParams.set("lang", "en");
+  for (const tag of PHOTON_SERVICE_TAGS) {
+    nearbyUrl.searchParams.append("osm_tag", tag);
+  }
+  const directory = await fetchJson(fetchImpl, nearbyUrl, undefined, "directory-error");
+  if (!Array.isArray(directory.features)) {
     throw new ServiceCentreSearchError("directory-error");
   }
-  const elements = directory.elements;
   const seen = new Set();
-  const centres = elements
-    .map((element) => toServiceCentre(element, origin))
+  const centres = directory.features
+    .map((feature) => toServiceCentre(feature, origin))
     .filter((centre) => {
       if (!centre || seen.has(centre.id)) return false;
       seen.add(centre.id);
